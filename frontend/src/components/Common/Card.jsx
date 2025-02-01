@@ -1,19 +1,19 @@
 import React from 'react';
 
 export const Card = ({ children, className = '' }) => (
-  <div className={`bg-white rounded-lg shadow-md p-6 ${className}`}>
+  <div className={`bg-white rounded-lg shadow-md px-3 sm:px-6 py-[1rem] ${className}`}>
     {children}
   </div>
 );
 
 export const CardHeader = ({ children, className = '' }) => (
-  <div className={`flex flex-row items-center justify-between mb-4 ${className}`}>
+  <div className={`flex flex-col  sm:flex-row items-center justify-between mb-4 gap-3 sm:gap-0 ${className}`}>
     {children}
   </div>
 );
 
 export const CardTitle = ({ children, className = '' }) => (
-  <h2 className={`text-2xl font-bold text-gray-800 ${className}`}>
+  <h2 className={`text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-600 to-blue-600 bg-clip-text text-transparent ${className}`}>
     {children}
   </h2>
 );

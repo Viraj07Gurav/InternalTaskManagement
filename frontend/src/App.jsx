@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import AddEmployee from "./components/admin/AddEmployee";
 import ProtectedRoute from "./Routes/ProtectedRoute";
 import EmployeeList from "./components/admin/EmployeeList";
+import ReportGenerator from "./components/admin/ReportGenerator";
 
 function App() {
   return (
@@ -31,8 +32,19 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* <Route
+            path="/report"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <ReportGenerator />
+              </ProtectedRoute>
+            }
+          /> */}
+
+<Route path="/report" element={<ReportGenerator />} />
+
           <Route path="/dashboard" element={<MainPage />} />
-          
         </Routes>
       </BrowserRouter>
     </SessionProvider>

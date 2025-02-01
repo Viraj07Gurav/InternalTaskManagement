@@ -42,6 +42,8 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     return <Navigate to="/dashboard" replace />;
   }
 
+
+
   // Otherwise, render the protected route
   return children;
 };

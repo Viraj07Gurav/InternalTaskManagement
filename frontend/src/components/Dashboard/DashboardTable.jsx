@@ -242,29 +242,29 @@ const DashboardTable = ({ tasks, setTasks }) => {
         <div className="overflow-x-auto rounded-tl-lg rounded-tr-lg">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="text-gray-700">
-                <th className="px-4 py-3 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
+              <tr className="text-gray-700 text-sm">
+                <th className="px-4 py-2 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
                   Assignee
                 </th>
-                <th className="px-4 py-3 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
+                <th className="px-4 py-2 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
                   Client
                 </th>
-                <th className="px-4 py-3 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
+                <th className="px-4 py-2 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
                   Package
                 </th>
-                <th className="px-4 py-3 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
+                <th className="px-4 py-2 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
                   Start Date
                 </th>
-                <th className="px-4 py-3 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
+                <th className="px-4 py-2 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
                   Time Left
                 </th>
-                <th className="px-4 py-3 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
+                <th className="px-4 py-2 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
                   Progress
                 </th>
-                <th className="px-4 py-3 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
+                <th className="px-4 py-2 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
+                <th className="px-4 py-2 text-left bg-gray-100 border-b-2 border-gray-300 font-medium whitespace-nowrap">
                   Actions
                 </th>
               </tr>
@@ -285,7 +285,7 @@ const DashboardTable = ({ tasks, setTasks }) => {
                 return (
                   <tr
                     key={index}
-                    className={`hover:bg-blue-100 transition-colors duration-200 text-sm text-gray-700 ${rowClass}`}
+                    className={`hover:bg-blue-100 transition-colors duration-200 text-[13px] text-gray-700 ${rowClass}`}
                   >
                     <td className="px-4 py-2 border-b border-gray-300 whitespace-nowrap">
                       {task.assignee_username}
@@ -315,13 +315,13 @@ const DashboardTable = ({ tasks, setTasks }) => {
                           style={{ width: `${progress}%` }}
                         />
                       </div>
-                      <span className="block text-center text-sm">
+                      <span className="block text-center text-xs">
                         {task.completed_subtasks}/{task.total_subtasks}
                       </span>
                     </td>
                     <td className="px-4 py-2 border-b border-gray-300 whitespace-nowrap">
                       <span
-                        className={`px-2 py-1 rounded-full text-sm font-medium ${
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
                           task.status === "Pending"
                             ? "bg-yellow-200 text-yellow-800"
                             : "bg-green-200 text-green-800"
@@ -331,12 +331,12 @@ const DashboardTable = ({ tasks, setTasks }) => {
                       </span>
                     </td>
                     <td className="px-4 py-2 border-b border-gray-300 whitespace-nowrap">
-                      <button
+                      {/* <button
                         onClick={() => handleEditButton(index)}
                         className="text-blue-500 hover:text-blue-600 cursor-pointer"
                       >
                         <Edit2 size={16} />
-                      </button>
+                      </button> */}
                       <button
                         onClick={() => handleRemoveTask(task.id)}
                         className="text-red-500 hover:text-red-600 cursor-pointer ml-2"

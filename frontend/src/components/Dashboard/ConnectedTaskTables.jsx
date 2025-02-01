@@ -165,87 +165,6 @@ const ConnectedTaskTables = () => {
   endOfDay.setHours(23, 59, 59, 999);
   const [countdown, setCountdown] = useState("");
 
-  // Utility function to handle Excel report generation
-  const generateExcelReport = () => {
-    const groupedTasks = tasks.reduce((acc, task) => {
-      const clientPackageKey = `${task.client} - ${task.package}`;
-      if (!acc[clientPackageKey]) {
-        acc[clientPackageKey] = [];
-      }
-
-      const startDate = new Date(task.startDate);
-      const todayDate = new Date(today);
-      const dailyCompletionData = [];
-
-      // Loop through the days from start date to today
-      for (
-        let currentDate = new Date(startDate);
-        currentDate <= todayDate;
-        currentDate.setDate(currentDate.getDate() + 1)
-      ) {
-        const formattedDate = format(currentDate, "yyyy-MM-dd");
-        const taskCompletion = task.dailyCompletions[formattedDate] || {};
-
-        const isAnyTaskCompleted =
-          taskCompletion.posts ||
-          taskCompletion.reels ||
-          taskCompletion.mockups;
-
-        dailyCompletionData.push({
-          Client: task.client,
-          Package: task.package,
-          Date: formattedDate,
-          Posts: taskCompletion.posts ? "Completed" : "Not Completed",
-          Reels: taskCompletion.reels ? "Completed" : "Not Completed",
-          Mockups: taskCompletion.mockups ? "Completed" : "Not Completed",
-          "Completed At": isAnyTaskCompleted
-            ? format(new Date(), "HH:mm:ss")
-            : "Not Completed",
-        });
-      }
-
-      acc[clientPackageKey] = acc[clientPackageKey].concat(dailyCompletionData);
-      return acc;
-    }, {});
-
-    // Create a new workbook
-    const wb = XLSX.utils.book_new();
-
-    // Define column widths
-    const columnWidths = [
-      { wch: 15 }, // Client
-      { wch: 12 }, // Package
-      { wch: 12 }, // Date
-      { wch: 15 }, // Posts
-      { wch: 15 }, // Reels
-      { wch: 15 }, // Mockups
-      { wch: 15 }, // Completed At
-    ];
-
-    // For each client-package group, create a sheet
-    Object.entries(groupedTasks).forEach(([clientPackage, taskReport]) => {
-      const ws = XLSX.utils.json_to_sheet(taskReport, {
-        header: [
-          "Client",
-          "Package",
-          "Date",
-          "Posts",
-          "Reels",
-          "Mockups",
-          "Completed At",
-        ],
-      });
-
-      // Apply column widths
-      ws["!cols"] = columnWidths;
-
-      // Add this worksheet to the workbook
-      XLSX.utils.book_append_sheet(wb, ws, clientPackage);
-    });
-
-    // Write the workbook to a file
-    XLSX.writeFile(wb, "Daily_Task_Report.xlsx");
-  };
 
   const isTimeLeftLessThanSixHours = () => {
     const timeLeft = endOfDay - new Date();
@@ -272,17 +191,17 @@ const ConnectedTaskTables = () => {
   const getIncompleteTasks = (task) => {
     const todayCompletions = task.dailyCompletions?.[formattedToday] || {};
     const incompleteTasks = [];
-    
+
     if (!todayCompletions.posts) {
-      incompleteTasks.push('posts');
+      incompleteTasks.push("posts");
     }
     if (!todayCompletions.reels) {
-      incompleteTasks.push('reels');
+      incompleteTasks.push("reels");
     }
     if (!todayCompletions.mockups) {
-      incompleteTasks.push('mockups');
+      incompleteTasks.push("mockups");
     }
-    
+
     return incompleteTasks;
   };
 
@@ -303,13 +222,13 @@ const ConnectedTaskTables = () => {
         <table className="w-full border-collapse bg-white shadow-lg rounded-lg">
           <thead>
             <tr className="bg-gray-300 text-gray-700 text-sm font-medium">
-              <th className="p-4 text-left whitespace-nowrap">Client</th>
-              <th className="p-4 text-left whitespace-nowrap">Package</th>
-              <th className="p-4 text-left whitespace-nowrap">Today's Tasks</th>
-              <th className="p-4 text-left whitespace-nowrap">
+              <th className="px-4 py-2 text-left whitespace-nowrap">Client</th>
+              <th className="px-4 py-2 text-left whitespace-nowrap">Package</th>
+              <th className="px-4 py-2 text-left whitespace-nowrap">Today's Tasks</th>
+              <th className="px-4 py-2 text-left whitespace-nowrap">
                 Overall Progress
               </th>
-              <th className="p-4 text-left whitespace-nowrap">Time Left</th>
+              <th className="px-4 py-2 text-left whitespace-nowrap">Time Left</th>
             </tr>
           </thead>
           <tbody>
@@ -378,7 +297,7 @@ const ConnectedTaskTables = () => {
                     }`}
                   >
                     {isTodayCompleted(task)
-                      ? "Today's Tasks Completed"
+                      ? "Today's Tasks Completed 😊"
                       : timeLeft}
                   </td>
                 </tr>
@@ -388,27 +307,21 @@ const ConnectedTaskTables = () => {
         </table>
       </div>
 
-      {/* Download Report Button */}
-      <div className="mb-[2rem] flex justify-center sm:justify-end">
-        <button
-          onClick={generateExcelReport}
-          className="bg-blue-500 text-white px-4 py-2 text-sm sm:text-base rounded-md hover:bg-blue-600 cursor-pointer"
-        >
-          Download Today's Task Report
-        </button>
-      </div>
+      
 
       {/* Overdue Tasks Table */}
-      <h2 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-6 mt-8">
-        Overdue Tasks
-      </h2>
-      <div className="flex flex-col gap-3">
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="px-3 py-1 text-base font-medium text-gray-700 border-2 border-gray-300 rounded-lg bg-gray-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-300 w-36"
-        />
+      <div className="flex flex-col  mt-[2rem]">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center text-gray-700 mb-6 mt-8">
+            Overdue Tasks
+          </h2>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="px-3 py-1 h-11 text-base font-medium text-gray-700 border-2 border-gray-300 rounded-lg bg-gray-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-300 w-36"
+          />
+        </div>
 
         {getOverdueTasks().map((task) => (
           <div key={task.id}>{task.client}</div>
@@ -615,6 +528,16 @@ const ConnectedTaskTables = () => {
 
 export default ConnectedTaskTables;
 
+
+
+
+
+
+
+
+
+
+
 // // Temporary testing: Simulate end of day
 // const getOverdueTasks = () => {
 //   const now = new Date();
@@ -651,3 +574,102 @@ export default ConnectedTaskTables;
 //     total: { posts: 30, reels: 20, mockups: 30 },
 //   },
 // };
+
+
+
+
+
+
+
+{/* Download Report Button */}
+      {/* <div className="mb-[2rem] flex justify-center sm:justify-end">
+        <button
+          onClick={generateExcelReport}
+          className="bg-blue-500 text-white px-4 py-2 text-sm sm:text-base rounded-md hover:bg-blue-600 cursor-pointer"
+        >
+          Download Today's Task Report
+        </button>
+      </div> */}
+
+
+       // Utility function to handle Excel report generation
+  // const generateExcelReport = () => {
+  //   const groupedTasks = tasks.reduce((acc, task) => {
+  //     const clientPackageKey = `${task.client} - ${task.package}`;
+  //     if (!acc[clientPackageKey]) {
+  //       acc[clientPackageKey] = [];
+  //     }
+
+  //     const startDate = new Date(task.startDate);
+  //     const todayDate = new Date(today);
+  //     const dailyCompletionData = [];
+
+  //     // Loop through the days from start date to today
+  //     for (
+  //       let currentDate = new Date(startDate);
+  //       currentDate <= todayDate;
+  //       currentDate.setDate(currentDate.getDate() + 1)
+  //     ) {
+  //       const formattedDate = format(currentDate, "yyyy-MM-dd");
+  //       const taskCompletion = task.dailyCompletions[formattedDate] || {};
+
+  //       const isAnyTaskCompleted =
+  //         taskCompletion.posts ||
+  //         taskCompletion.reels ||
+  //         taskCompletion.mockups;
+
+  //       dailyCompletionData.push({
+  //         Client: task.client,
+  //         Package: task.package,
+  //         Date: formattedDate,
+  //         Posts: taskCompletion.posts ? "Completed" : "Not Completed",
+  //         Reels: taskCompletion.reels ? "Completed" : "Not Completed",
+  //         Mockups: taskCompletion.mockups ? "Completed" : "Not Completed",
+  //         "Completed At": isAnyTaskCompleted
+  //           ? format(new Date(), "HH:mm:ss")
+  //           : "Not Completed",
+  //       });
+  //     }
+
+  //     acc[clientPackageKey] = acc[clientPackageKey].concat(dailyCompletionData);
+  //     return acc;
+  //   }, {});
+
+  //   // Create a new workbook
+  //   const wb = XLSX.utils.book_new();
+
+  //   // Define column widths
+  //   const columnWidths = [
+  //     { wch: 15 }, // Client
+  //     { wch: 12 }, // Package
+  //     { wch: 12 }, // Date
+  //     { wch: 15 }, // Posts
+  //     { wch: 15 }, // Reels
+  //     { wch: 15 }, // Mockups
+  //     { wch: 15 }, // Completed At
+  //   ];
+
+  //   // For each client-package group, create a sheet
+  //   Object.entries(groupedTasks).forEach(([clientPackage, taskReport]) => {
+  //     const ws = XLSX.utils.json_to_sheet(taskReport, {
+  //       header: [
+  //         "Client",
+  //         "Package",
+  //         "Date",
+  //         "Posts",
+  //         "Reels",
+  //         "Mockups",
+  //         "Completed At",
+  //       ],
+  //     });
+
+  //     // Apply column widths
+  //     ws["!cols"] = columnWidths;
+
+  //     // Add this worksheet to the workbook
+  //     XLSX.utils.book_append_sheet(wb, ws, clientPackage);
+  //   });
+
+  //   // Write the workbook to a file
+  //   XLSX.writeFile(wb, "Daily_Task_Report.xlsx");
+  // };

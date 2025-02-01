@@ -4,11 +4,12 @@ import { useSessionContext } from "../../Context/SessionContext";
 import Input from "../Common/Input";
 import Button from "../Common/Button";
 import { Alert, AlertTitle, AlertDescription } from "../Common/SuccessDialog";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff } from "lucide-react";
 
 const AddEmployee = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(true); // Toggle password visibility
   const [error, setError] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const { accessToken, role } = useSessionContext(); // Ensure you're using 'accessToken' from context
@@ -18,7 +19,8 @@ const AddEmployee = () => {
   useEffect(() => {
     if (!accessToken) {
       navigate("/login");
-    } else if (role !== "admin") { // Assuming 'admin' is required to add an employee
+    } else if (role !== "admin") {
+      // Assuming 'admin' is required to add an employee
       navigate("/dashboard"); // Or wherever the non-admin should be redirected
     }
   }, [accessToken, role, navigate]);
@@ -63,7 +65,9 @@ const AddEmployee = () => {
       {showSuccess && (
         <Alert className="fixed top-4 right-4 w-80 border-green-200 bg-green-50 text-green-800 animate-slide-down shadow-lg">
           <CheckCircle2 className="h-5 w-5 text-green-600" />
-          <AlertTitle className="text-green-800 font-semibold">Success!</AlertTitle>
+          <AlertTitle className="text-green-800 font-semibold">
+            Success!
+          </AlertTitle>
           <AlertDescription className="text-green-700">
             Employee added successfully
           </AlertDescription>
@@ -90,7 +94,9 @@ const AddEmployee = () => {
             <h1 className="text-blue-600 text-2xl font-bold">TaskFlow</h1>
           </div>
           <div className="flex flex-row justify-between items-center relative">
-            <h1 className="text-3xl font-semibold text-gray-800">Create Employee</h1>
+            <h1 className="text-3xl font-semibold text-gray-800">
+              Create Employee
+            </h1>
           </div>
         </div>
 
@@ -104,14 +110,24 @@ const AddEmployee = () => {
             onChange={(e) => setUsername(e.target.value)}
             required
           />
-          <Input
-            label="Password"
-            type="password"
-            placeholder="Enter employee's password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div className="relative">
+            <Input
+              label="Password"
+              type={showPassword ? "password" : "text"} // Toggle visibility based on showPassword state
+              placeholder="Enter employee's password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-8 text-gray-500"
+              onClick={() => setShowPassword((prev) => !prev)} // Toggle password visibility
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}{" "}
+              {/* Toggle Eye icon */}
+            </button>
+          </div>
 
           <Button
             variant="primary"

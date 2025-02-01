@@ -133,8 +133,9 @@ import React, { useState, useEffect } from "react";
 import { AiOutlineDashboard } from "react-icons/ai";
 import { IoSettings } from "react-icons/io5";
 import { BiTask } from "react-icons/bi";
-import { FaClipboardList } from "react-icons/fa";
 import { useSessionContext } from "../../Context/SessionContext"; 
+import { IoIosPeople } from "react-icons/io";
+import { TbReport } from "react-icons/tb";
 
 const Sidebar = ({ isSidebarOpen, setIsSidebarOpen, setActiveView }) => {
   const { role } = useSessionContext();  // Get the role from context
@@ -154,11 +155,18 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen, setActiveView }) => {
       view: "dashboard", 
     },
     {
-      icon: <FaClipboardList className="w-6 h-6" />,
+      icon: <IoIosPeople className="w-6 h-6" />,
       label: "Employee List",
       href: "/employees",
       roles: ["admin"],
       view: "employees", 
+    },
+    {
+      icon: <TbReport className="w-6 h-6" />,
+      label: "Report",
+      href: "/report",
+      roles: ["admin"],
+      view: "report"
     },
     {
       icon: <IoSettings className="w-6 h-6" />,
@@ -166,6 +174,7 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen, setActiveView }) => {
       href: "/settings",
       roles: ["admin"],
     },
+   
   ];
 
   return (
@@ -183,7 +192,7 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen, setActiveView }) => {
         </div>
       </div>
 
-      <nav className="mt-6 space-y-2 px-2">
+      <nav className="mt-6  px-1">
         {menuItems
           .filter((item) => item.roles.includes(userRole))  // Filter based on the userRole
           .map((item, index) => (
@@ -196,7 +205,7 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen, setActiveView }) => {
               }}
               className="relative flex items-center gap-4 px-3 lg:px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-800 rounded-lg transition-all group"
             >
-              <span className="flex-shrink-0">{item.icon}</span>
+              <span className="flex-shrink-0 group-hover:scale-110">{item.icon}</span>
               <span className="hidden lg:block font-medium group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                 {item.label}
               </span>

@@ -377,39 +377,90 @@ app.post("/login", (req, res) => {
 });
 
 
-// Refresh Token Route
-app.post("/refresh", (req, res) => {
-  const { refreshToken } = req.body;
 
-  if (!refreshToken) {
-    return res.status(403).json({ message: "Refresh token required" });
+// Refresh Token Route
+app.put("/resetPassword/:username", async (req, res) => {
+  const { username } = req.params;
+  const { newPassword } = req.body;
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized" });
   }
 
-  db.execute(
-    "SELECT * FROM employees WHERE refresh_token = ?",
-    [refreshToken],
-    (err, results) => {
-      if (err) {
-        return res.status(500).json({ message: "Database error", error: err });
-      }
-
-      if (results.length === 0) {
-        return res.status(403).json({ message: "Invalid refresh token" });
-      }
-
-      const employee = results[0];
-
-      jwt.verify(refreshToken, REFRESH_SECRET, (err, decoded) => {
-        if (err || decoded.username !== employee.username) {
-          return res.status(403).json({ message: "Invalid refresh token" });
-        }
-
-        const newAccessToken = generateAccessToken(employee.username, employee.role);
-        res.json({ accessToken: newAccessToken });
-      });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== "admin") {
+      return res.status(403).json({ message: "Access denied. Admin only." });
     }
-  );
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the password in the database
+    const [result] = await db.promise().execute(
+      "UPDATE employees SET password = ? WHERE username = ?",
+      [hashedPassword, username]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    // Return success response with the temporary password only for auto-generated passwords
+    res.json({ 
+      message: "Password reset successful",
+      temporaryPassword: newPassword  // This will only be shown for auto-generated passwords
+    });
+
+  } catch (err) {
+    console.error("Error resetting password:", err);
+    res.status(500).json({ message: "Failed to reset password" });
+  }
 });
+
+
+//Reset Password
+app.put("/resetPassword/:username", async (req, res) => {
+  const { username } = req.params;
+  const { newPassword } = req.body;
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== "admin") {
+      return res.status(403).json({ message: "Access denied. Admin only." });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the password in the database
+    const [result] = await db.promise().execute(
+      "UPDATE employees SET password = ? WHERE username = ?",
+      [hashedPassword, username]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    // Return success response with the temporary password
+    res.json({ 
+      message: "Password reset successful",
+      temporaryPassword: newPassword
+    });
+
+  } catch (err) {
+    console.error("Error resetting password:", err);
+    res.status(500).json({ message: "Failed to reset password" });
+  }
+});
+
 
 // Admin route to add a new employee
 app.post("/addEmployee", async (req, res) => {

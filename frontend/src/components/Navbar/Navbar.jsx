@@ -102,17 +102,7 @@ const Navbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
     setUsername(usernameFromSession || usernameFromLocal || ""); // Default to empty string if no username is found
   }, []);
 
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("darkMode") === "true";
-    setIsDarkMode(savedTheme);
-    document.documentElement.classList.toggle("dark", savedTheme);
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("darkMode", isDarkMode.toString());
-    document.documentElement.classList.toggle("dark", isDarkMode);
-  }, [isDarkMode]);
-
+  
   const handleLogout = () => {
     // Clear user data from sessionStorage and localStorage
     sessionStorage.removeItem("userRole");
@@ -234,7 +224,7 @@ const Navbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
           </div>
         )}
 
-        <button
+        {/* <button
           className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           onClick={() => setIsDarkMode((prev) => !prev)}
         >
@@ -243,7 +233,7 @@ const Navbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
           ) : (
             <HiSun className="w-6 h-6 text-gray-600" />
           )}
-        </button>
+        </button> */}
 
         <div className="relative flex items-center space-x-2">
           <h2 className="flex flex-row items-center text-base font-bold text-[#216ac9] cursor-pointer"
