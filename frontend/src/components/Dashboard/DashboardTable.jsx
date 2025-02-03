@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { PlusCircle, Trash2, X, Edit2 } from "lucide-react";
+import { PlusCircle, Trash2, X, Edit2, AlertCircle } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -7,8 +7,19 @@ import {
   CardContent,
   Button,
 } from "../Common/Card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../Common/AlertDialog";
 import { format, differenceInDays } from "date-fns";
 import { useSessionContext } from "../../Context/SessionContext";
+import { ToastContainer, toast } from "react-toastify";
 
 const Input = (props) => (
   <input
@@ -36,6 +47,7 @@ const Select = ({ children, ...props }) => (
 
 const DashboardTable = ({ tasks, setTasks }) => {
   const { accessToken, role } = useSessionContext(); // Access accessToken and role from context
+  const [taskToDelete, setTaskToDelete] = useState(null);
 
   const packageDetails = {
     Starter: { days: 12, posts: 12, reels: 5, mockups: 12 },
@@ -140,9 +152,12 @@ const DashboardTable = ({ tasks, setTasks }) => {
         completed_subtasks: 0,
         total_subtasks: 0,
       });
+
+      toast.success("Client added successfully!");
     } catch (err) {
       setError(err.message);
       console.error("Error:", err);
+      toast.error(`Error: ${err.message}`);
     }
   };
 
@@ -173,13 +188,16 @@ const DashboardTable = ({ tasks, setTasks }) => {
       if (response.ok) {
         fetchTasks();
         setShowModal(false);
+        toast.success("Task updated successfully!");
       } else {
         const data = await response.json();
         setError(data.message);
+        toast.error(data.message || "Failed to update task");
       }
     } catch (err) {
       setError("Failed to update task");
       console.error("Error:", err);
+      toast.error(`Error: Failed to update task ${err.message}`);
     }
   };
 
@@ -189,19 +207,23 @@ const DashboardTable = ({ tasks, setTasks }) => {
       const response = await fetch(`http://localhost:5000/tasks/${id}`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${accessToken}`, // Use accessToken from context
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
       if (response.ok) {
         fetchTasks();
+        setTaskToDelete(null); // Clear the taskToDelete state
+        toast.success("Task deleted successfully!");
       } else {
         const data = await response.json();
         setError(data.message);
+        toast.error(data.message || "Failed to delete task");
       }
     } catch (err) {
       setError("Failed to delete task");
       console.error("Error:", err);
+      toast.error("Error: Failed to delete task");
     }
   };
 
@@ -338,7 +360,7 @@ const DashboardTable = ({ tasks, setTasks }) => {
                         <Edit2 size={16} />
                       </button> */}
                       <button
-                        onClick={() => handleRemoveTask(task.id)}
+                        onClick={() => setTaskToDelete(task)}
                         className="text-red-500 hover:text-red-600 cursor-pointer ml-2"
                       >
                         <Trash2 size={16} />
@@ -482,6 +504,43 @@ const DashboardTable = ({ tasks, setTasks }) => {
           </div>
         </div>
       )}
+
+      <AlertDialog
+        open={taskToDelete !== null}
+        onOpenChange={() => setTaskToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Confirm Task Deletion
+            </AlertDialogTitle>
+            <AlertDialogDescription className="pt-2">
+              Are you sure you want to delete the task for client{" "}
+              <span className="font-bold text-red-800">
+                {taskToDelete?.client}
+              </span>{" "}
+              from the system?
+              <p className="mt-2 text-gray-800 text-xs">
+                This action cannot be undone. All associated task data will be
+                permanently deleted.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                handleRemoveTask(taskToDelete.id);
+              }}
+            >
+              Delete Task
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <ToastContainer />
     </Card>
   );
 };

@@ -95,15 +95,21 @@ const ConnectedTaskTables = () => {
     fetchTasks();
   }, [accessToken, username]);
 
-  const handleTaskCompletion = async (task, taskType) => {
+  const handleTaskCompletion = async (
+    task,
+    taskType,
+    date = formattedToday
+  ) => {
     try {
-      // Create a copy of today's completions or initialize it if it doesn't exist
+      // Create a copy of all historical completions
       const updatedCompletions = {
-        ...task.dailyCompletions?.[formattedToday],
-        [taskType]: !task.dailyCompletions?.[formattedToday]?.[taskType],
+        ...task.dailyCompletions,
+        [date]: {
+          ...task.dailyCompletions?.[date],
+          [taskType]: !task.dailyCompletions?.[date]?.[taskType],
+        },
       };
 
-      // Send the entire updated completions object for the date
       const response = await fetch(
         `http://localhost:5000/tasks/${task.id}/complete`,
         {
@@ -113,28 +119,25 @@ const ConnectedTaskTables = () => {
             Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
-            completedTasks: updatedCompletions, // Send the entire object
-            date: formattedToday,
+            completedTasks: updatedCompletions[date],
+            date: date,
+            allCompletions: updatedCompletions,
           }),
         }
       );
 
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
-      }
 
       const responseData = await response.json();
 
-      // Update the local state with the new completions
+      // Update local state
       setTasks((prevTasks) =>
         prevTasks.map((t) =>
           t.id === task.id
             ? {
                 ...t,
-                dailyCompletions: {
-                  ...t.dailyCompletions,
-                  [formattedToday]: updatedCompletions,
-                },
+                dailyCompletions: updatedCompletions,
               }
             : t
         )
@@ -154,9 +157,20 @@ const ConnectedTaskTables = () => {
   };
 
   const calculateTotalCompleted = (task, taskType) => {
-    return Object.values(task.dailyCompletions || {}).filter(
-      (day) => day[taskType]
-    ).length;
+    if (!task.dailyCompletions) return 0;
+
+    // Convert dates to proper format for comparison
+    const endDate = new Date(task.start_date);
+    endDate.setDate(
+      endDate.getDate() + packageRequirements[task.package].duration
+    );
+
+    return Object.entries(task.dailyCompletions)
+      .filter(([date]) => {
+        const taskDate = new Date(date);
+        return taskDate >= new Date(task.start_date) && taskDate <= endDate;
+      })
+      .filter(([_, completion]) => completion[taskType]).length;
   };
 
   // Time left calculation
@@ -164,7 +178,6 @@ const ConnectedTaskTables = () => {
   const endOfDay = new Date();
   endOfDay.setHours(23, 59, 59, 999);
   const [countdown, setCountdown] = useState("");
-
 
   const isTimeLeftLessThanSixHours = () => {
     const timeLeft = endOfDay - new Date();
@@ -207,8 +220,27 @@ const ConnectedTaskTables = () => {
 
   const getOverdueTasks = () => {
     return tasks.filter((task) => {
-      const taskDate = new Date(task.start_date).toISOString().split("T")[0];
-      return taskDate === selectedDate && !isTodayCompleted(task);
+      const taskDate = new Date(task.start_date);
+      const selectedDateObj = new Date(selectedDate);
+      const packageEndDate = new Date(task.start_date);
+      packageEndDate.setDate(
+        packageEndDate.getDate() + packageRequirements[task.package].duration
+      );
+
+      // Check if selected date is within the package duration
+      const isWithinDuration =
+        selectedDateObj >= taskDate && selectedDateObj <= packageEndDate;
+
+      // Get completions for selected date
+      const dateCompletions = task.dailyCompletions?.[selectedDate] || {};
+
+      // Check if any required tasks are incomplete
+      const hasIncompleteTasks =
+        !dateCompletions.posts ||
+        !dateCompletions.reels ||
+        !dateCompletions.mockups;
+
+      return isWithinDuration && hasIncompleteTasks;
     });
   };
 
@@ -224,11 +256,15 @@ const ConnectedTaskTables = () => {
             <tr className="bg-gray-300 text-gray-700 text-sm font-medium">
               <th className="px-4 py-2 text-left whitespace-nowrap">Client</th>
               <th className="px-4 py-2 text-left whitespace-nowrap">Package</th>
-              <th className="px-4 py-2 text-left whitespace-nowrap">Today's Tasks</th>
+              <th className="px-4 py-2 text-left whitespace-nowrap">
+                Today's Tasks
+              </th>
               <th className="px-4 py-2 text-left whitespace-nowrap">
                 Overall Progress
               </th>
-              <th className="px-4 py-2 text-left whitespace-nowrap">Time Left</th>
+              <th className="px-4 py-2 text-left whitespace-nowrap">
+                Time Left
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -307,10 +343,8 @@ const ConnectedTaskTables = () => {
         </table>
       </div>
 
-      
-
       {/* Overdue Tasks Table */}
-      <div className="flex flex-col  mt-[2rem]">
+      <div className="flex flex-col mt-[2rem]">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl sm:text-3xl font-bold text-center text-gray-700 mb-6 mt-8">
             Overdue Tasks
@@ -323,26 +357,17 @@ const ConnectedTaskTables = () => {
           />
         </div>
 
-        {getOverdueTasks().map((task) => (
-          <div key={task.id}>{task.client}</div>
-        ))}
-
-        <div
-          className={`overflow-x-auto overflow-y-auto rounded-tl-lg rounded-tr-lg shadow-md mb-[2.5rem] ${
-            getOverdueTasks().length === 0 ? "h-[6.3rem]" : "h-[20rem]"
-          }`}
-        >
-          <table className="w-full border-collapse bg-white shadow-lg ">
+        <div className="overflow-x-auto overflow-y-auto rounded-tl-lg rounded-tr-lg shadow-md mb-[2.5rem]">
+          <table className="w-full border-collapse bg-white shadow-lg">
             <thead>
               <tr className="bg-red-100 text-gray-700 text-sm font-medium">
                 <th className="p-4 text-left">Client</th>
                 <th className="p-4 text-left">Package</th>
-                <th className="p-4 text-left">Tasks</th>
-                <th className="p-4 text-left">Status</th>
+                <th className="p-4 text-left">Incomplete Tasks</th>
+                <th className="p-4 text-left">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {/* No rows initially, will be populated when the day ends */}
               {getOverdueTasks().length === 0 ? (
                 <tr className="text-center">
                   <td colSpan="4" className="px-4 py-3 text-gray-500">
@@ -351,13 +376,13 @@ const ConnectedTaskTables = () => {
                 </tr>
               ) : (
                 getOverdueTasks().map((task) => {
-                  const incompleteTasks = getIncompleteTasks(task);
-                  const isAllCompleted = incompleteTasks.length === 0;
+                  const dateCompletions =
+                    task.dailyCompletions?.[selectedDate] || {};
 
                   return (
                     <tr
                       key={`overdue-${task.id}`}
-                      className="border-b border-gray-300 text-sm hover:bg-red-50 "
+                      className="border-b border-gray-300 text-sm hover:bg-red-50"
                     >
                       <td className="px-4 py-2">{task.client}</td>
                       <td className="px-4 py-2">{task.package}</td>
@@ -365,36 +390,50 @@ const ConnectedTaskTables = () => {
                         <div className="flex flex-col space-y-2">
                           {Object.entries(
                             packageRequirements[task.package].dailyTasks
-                          ).map(([type, count]) => (
-                            <div
-                              key={type}
-                              className="flex items-center space-x-4"
-                            >
-                              <span className="w-20 capitalize">{type}:</span>
-                              <button
-                                onClick={() =>
-                                  handleTaskCompletion(task.id, type)
-                                }
-                                className="flex items-center space-x-2"
+                          )
+                            .filter(([type]) => !dateCompletions[type])
+                            .map(([type]) => (
+                              <div
+                                key={type}
+                                className="flex items-center space-x-4"
                               >
-                                {task.dailyCompletions[today]?.[type] ? (
-                                  <CheckCircle2 className="w-5 h-5 text-green-500" />
-                                ) : (
-                                  <Circle className="w-5 h-5 text-gray-400" />
-                                )}
-                              </button>
-                            </div>
-                          ))}
+                                <span className="w-20 capitalize">{type}</span>
+                                <button
+                                  onClick={() =>
+                                    handleTaskCompletion(
+                                      task,
+                                      type,
+                                      selectedDate
+                                    )
+                                  }
+                                  className="flex items-center space-x-2"
+                                >
+                                  {dateCompletions[type] ? (
+                                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                  ) : (
+                                    <Circle className="w-5 h-5 text-gray-400" />
+                                  )}
+                                </button>
+                              </div>
+                            ))}
                         </div>
                       </td>
-                      <td
-                        className={`px-4 py-2 font-medium ${
-                          isTodayCompleted(task)
-                            ? "text-green-500"
-                            : "text-red-500"
-                        }`}
-                      >
-                        {isTodayCompleted(task) ? "Completed 😊" : "Overdue 😔"}
+                      <td className="px-4 py-2">
+                        <button
+                          onClick={() => {
+                            // Complete all incomplete tasks for this date
+                            Object.entries(
+                              packageRequirements[task.package].dailyTasks
+                            )
+                              .filter(([type]) => !dateCompletions[type])
+                              .forEach(([type]) => {
+                                handleTaskCompletion(task, type, selectedDate);
+                              });
+                          }}
+                          className="bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-4 py-1 rounded-md"
+                        >
+                          Complete All
+                        </button>
                       </td>
                     </tr>
                   );
@@ -528,16 +567,6 @@ const ConnectedTaskTables = () => {
 
 export default ConnectedTaskTables;
 
-
-
-
-
-
-
-
-
-
-
 // // Temporary testing: Simulate end of day
 // const getOverdueTasks = () => {
 //   const now = new Date();
@@ -575,101 +604,98 @@ export default ConnectedTaskTables;
 //   },
 // };
 
-
-
-
-
-
-
-{/* Download Report Button */}
-      {/* <div className="mb-[2rem] flex justify-center sm:justify-end">
+{
+  /* Download Report Button */
+}
+{
+  /* <div className="mb-[2rem] flex justify-center sm:justify-end">
         <button
           onClick={generateExcelReport}
           className="bg-blue-500 text-white px-4 py-2 text-sm sm:text-base rounded-md hover:bg-blue-600 cursor-pointer"
         >
           Download Today's Task Report
         </button>
-      </div> */}
+      </div> */
+}
 
+// Utility function to handle Excel report generation
+// const generateExcelReport = () => {
+//   const groupedTasks = tasks.reduce((acc, task) => {
+//     const clientPackageKey = `${task.client} - ${task.package}`;
+//     if (!acc[clientPackageKey]) {
+//       acc[clientPackageKey] = [];
+//     }
 
-       // Utility function to handle Excel report generation
-  // const generateExcelReport = () => {
-  //   const groupedTasks = tasks.reduce((acc, task) => {
-  //     const clientPackageKey = `${task.client} - ${task.package}`;
-  //     if (!acc[clientPackageKey]) {
-  //       acc[clientPackageKey] = [];
-  //     }
+//     const startDate = new Date(task.startDate);
+//     const todayDate = new Date(today);
+//     const dailyCompletionData = [];
 
-  //     const startDate = new Date(task.startDate);
-  //     const todayDate = new Date(today);
-  //     const dailyCompletionData = [];
+//     // Loop through the days from start date to today
+//     for (
+//       let currentDate = new Date(startDate);
+//       currentDate <= todayDate;
+//       currentDate.setDate(currentDate.getDate() + 1)
+//     ) {
+//       const formattedDate = format(currentDate, "yyyy-MM-dd");
+//       const taskCompletion = task.dailyCompletions[formattedDate] || {};
 
-  //     // Loop through the days from start date to today
-  //     for (
-  //       let currentDate = new Date(startDate);
-  //       currentDate <= todayDate;
-  //       currentDate.setDate(currentDate.getDate() + 1)
-  //     ) {
-  //       const formattedDate = format(currentDate, "yyyy-MM-dd");
-  //       const taskCompletion = task.dailyCompletions[formattedDate] || {};
+//       const isAnyTaskCompleted =
+//         taskCompletion.posts ||
+//         taskCompletion.reels ||
+//         taskCompletion.mockups;
 
-  //       const isAnyTaskCompleted =
-  //         taskCompletion.posts ||
-  //         taskCompletion.reels ||
-  //         taskCompletion.mockups;
+//       dailyCompletionData.push({
+//         Client: task.client,
+//         Package: task.package,
+//         Date: formattedDate,
+//         Posts: taskCompletion.posts ? "Completed" : "Not Completed",
+//         Reels: taskCompletion.reels ? "Completed" : "Not Completed",
+//         Mockups: taskCompletion.mockups ? "Completed" : "Not Completed",
+//         "Completed At": isAnyTaskCompleted
+//           ? format(new Date(), "HH:mm:ss")
+//           : "Not Completed",
+//       });
+//     }
 
-  //       dailyCompletionData.push({
-  //         Client: task.client,
-  //         Package: task.package,
-  //         Date: formattedDate,
-  //         Posts: taskCompletion.posts ? "Completed" : "Not Completed",
-  //         Reels: taskCompletion.reels ? "Completed" : "Not Completed",
-  //         Mockups: taskCompletion.mockups ? "Completed" : "Not Completed",
-  //         "Completed At": isAnyTaskCompleted
-  //           ? format(new Date(), "HH:mm:ss")
-  //           : "Not Completed",
-  //       });
-  //     }
+//     acc[clientPackageKey] = acc[clientPackageKey].concat(dailyCompletionData);
+//     return acc;
+//   }, {});
 
-  //     acc[clientPackageKey] = acc[clientPackageKey].concat(dailyCompletionData);
-  //     return acc;
-  //   }, {});
+//   // Create a new workbook
+//   const wb = XLSX.utils.book_new();
 
-  //   // Create a new workbook
-  //   const wb = XLSX.utils.book_new();
+//   // Define column widths
+//   const columnWidths = [
+//     { wch: 15 }, // Client
+//     { wch: 12 }, // Package
+//     { wch: 12 }, // Date
+//     { wch: 15 }, // Posts
+//     { wch: 15 }, // Reels
+//     { wch: 15 }, // Mockups
+//     { wch: 15 }, // Completed At
+//   ];
 
-  //   // Define column widths
-  //   const columnWidths = [
-  //     { wch: 15 }, // Client
-  //     { wch: 12 }, // Package
-  //     { wch: 12 }, // Date
-  //     { wch: 15 }, // Posts
-  //     { wch: 15 }, // Reels
-  //     { wch: 15 }, // Mockups
-  //     { wch: 15 }, // Completed At
-  //   ];
+//   // For each client-package group, create a sheet
+//   Object.entries(groupedTasks).forEach(([clientPackage, taskReport]) => {
+//     const ws = XLSX.utils.json_to_sheet(taskReport, {
+//       header: [
+//         "Client",
+//         "Package",
+//         "Date",
+//         "Posts",
+//         "Reels",
+//         "Mockups",
+//         "Completed At",
+//       ],
+//     });
 
-  //   // For each client-package group, create a sheet
-  //   Object.entries(groupedTasks).forEach(([clientPackage, taskReport]) => {
-  //     const ws = XLSX.utils.json_to_sheet(taskReport, {
-  //       header: [
-  //         "Client",
-  //         "Package",
-  //         "Date",
-  //         "Posts",
-  //         "Reels",
-  //         "Mockups",
-  //         "Completed At",
-  //       ],
-  //     });
+//     // Apply column widths
+//     ws["!cols"] = columnWidths;
 
-  //     // Apply column widths
-  //     ws["!cols"] = columnWidths;
+//     // Add this worksheet to the workbook
+//     XLSX.utils.book_append_sheet(wb, ws, clientPackage);
+//   });
 
-  //     // Add this worksheet to the workbook
-  //     XLSX.utils.book_append_sheet(wb, ws, clientPackage);
-  //   });
-
-  //   // Write the workbook to a file
-  //   XLSX.writeFile(wb, "Daily_Task_Report.xlsx");
-  // };
+//   // Write the workbook to a file
+//   XLSX.writeFile(wb, "Daily_Task_Report.xlsx");
+// };

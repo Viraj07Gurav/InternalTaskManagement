@@ -73,8 +73,6 @@
 // export default NavbarWithSidebar;
 
 
-
-
 import React, { useState, useEffect } from "react";
 import { Menu, Bell } from "lucide-react";
 import { HiSun, HiMoon } from "react-icons/hi";
@@ -82,34 +80,90 @@ import { TbLogout2 } from "react-icons/tb";
 import { FaBell, FaTasks, FaRegCalendarCheck } from "react-icons/fa";
 import { MdOutlineKeyboardArrowDown } from "react-icons/md";
 import { useNavigate } from "react-router-dom"; // Import useNavigate
+import axios from "axios";
+import { useSessionContext } from "../../Context/SessionContext";
 
 const Navbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
-  const [userRole, setUserRole] = useState("");
-  const [username, setUsername] = useState("");
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+ 
+   const { accessToken, username, role } = useSessionContext();
 
   const navigate = useNavigate(); // Hook for navigation
 
-  useEffect(() => {
-    const roleFromSession = sessionStorage.getItem("userRole");
-    const roleFromLocal = localStorage.getItem("userRole");
-    setUserRole(roleFromSession || roleFromLocal || ""); // Default to empty string if no role is found
 
-    const usernameFromSession = sessionStorage.getItem("username");
-    const usernameFromLocal = localStorage.getItem("username");
-    setUsername(usernameFromSession || usernameFromLocal || ""); // Default to empty string if no username is found
+
+// For notifications
+  
+const fetchNotifications = async () => {
+  try {
+    const response = await axios.get(
+      `http://localhost:5000/notifications?username=${username}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (response.data.success) {
+      setNotifications(response.data.notifications);
+      setUnreadCount(
+        response.data.notifications.filter((n) => !n.read_status).length
+      );
+    } else {
+      console.error('Failed to fetch notifications:', response.data.message);
+    }
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+  }
+};
+
+  useEffect(() => {
+    fetchNotifications();
+    // Fetch notifications every minute
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
   }, []);
 
-  
+  const markAsRead = async (notificationId) => {
+    try {
+      const token =
+        localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken");
+      await axios.put(
+        `http://localhost:5000/notifications/${notificationId}/read`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+      fetchNotifications();
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
+
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case "deadline":
+        return <FaTasks className="text-yellow-500" />;
+      case "overdue":
+        return <FaBell className="text-red-500" />;
+      case "package_end":
+        return <FaRegCalendarCheck className="text-blue-500" />;
+      default:
+        return <FaBell className="text-gray-500" />;
+    }
+  };
+
   const handleLogout = () => {
     // Clear user data from sessionStorage and localStorage
     sessionStorage.removeItem("userRole");
     sessionStorage.removeItem("username");
     localStorage.removeItem("userRole");
     localStorage.removeItem("username");
-    
+
     // Navigate to the login page
     navigate("/login");
   };
@@ -118,44 +172,44 @@ const Navbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
     setIsDropdownOpen((prev) => !prev);
   };
 
-  const handleBellClick = () => {
-    setIsNotificationsVisible((prev) => !prev);
-  };
+  // const handleBellClick = () => {
+  //   setIsNotificationsVisible((prev) => !prev);
+  // };
 
-  const getNotifications = () => {
-    if (userRole === "admin") {
-      return [
-        { 
-          text: "New user registered", 
-          icon: <FaBell className="text-blue-500" />,
-          time: "2 minutes ago",
-          priority: "high"
-        },
-        { 
-          text: "System update available", 
-          icon: <FaTasks className="text-yellow-500" />,
-          time: "1 hour ago",
-          priority: "medium"
-        },
-      ];
-    } else if (userRole === "employee") {
-      return [
-        { 
-          text: "New task assigned", 
-          icon: <FaTasks className="text-green-500" />,
-          time: "5 minutes ago",
-          priority: "high"
-        },
-        { 
-          text: "Reminder: Goldmines due in 5 days", 
-          icon: <FaRegCalendarCheck className="text-orange-500" />,
-          time: "3 hours ago",
-          priority: "medium"
-        },
-      ];
-    }
-    return [];
-  };
+  // const getNotifications = () => {
+  //   if (userRole === "admin") {
+  //     return [
+  //       {
+  //         text: "New user registered",
+  //         icon: <FaBell className="text-blue-500" />,
+  //         time: "2 minutes ago",
+  //         priority: "high",
+  //       },
+  //       {
+  //         text: "System update available",
+  //         icon: <FaTasks className="text-yellow-500" />,
+  //         time: "1 hour ago",
+  //         priority: "medium",
+  //       },
+  //     ];
+  //   } else if (userRole === "employee") {
+  //     return [
+  //       {
+  //         text: "New task assigned",
+  //         icon: <FaTasks className="text-green-500" />,
+  //         time: "5 minutes ago",
+  //         priority: "high",
+  //       },
+  //       {
+  //         text: "Reminder: Goldmines due in 5 days",
+  //         icon: <FaRegCalendarCheck className="text-orange-500" />,
+  //         time: "3 hours ago",
+  //         priority: "medium",
+  //       },
+  //     ];
+  //   }
+  //   return [];
+  // };
 
   return (
     <nav className="sticky top-0 z-30 flex items-center justify-between px-6 py-3 bg-white dark:bg-gray-900 shadow-sm border-b border-gray-100 dark:border-gray-800">
@@ -171,55 +225,61 @@ const Navbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
       <div className="flex items-center space-x-4">
         <button
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
-          onClick={handleBellClick}
+          onClick={() => setIsNotificationsVisible(!isNotificationsVisible)}
         >
           <Bell className="w-6 h-6 text-gray-600 dark:text-gray-300" />
-          <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></span>
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center text-xs text-white">
+              {unreadCount}
+            </span>
+          )}
         </button>
 
         {isNotificationsVisible && (
-          <div className="absolute right-[2rem] sm:right-[7rem] top-14 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl w-[12rem] sm:w-[14rem] overflow-hidden">
+          <div className="absolute right-[2rem] sm:right-[7rem] top-14 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl w-[18rem] sm:w-[20rem] overflow-hidden">
             <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600">
               <div className="flex justify-between items-center">
-                <h3 className="text-base sm:text-lg font-semibold text-white">Notifications</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-white">
+                  Notifications
+                </h3>
                 <span className="text-sm text-white opacity-80">
-                  {getNotifications().length} New
+                  {unreadCount} Unread
                 </span>
               </div>
             </div>
-            
+
             <div className="max-h-96 overflow-y-auto">
-              {getNotifications().map((notification, index) => (
-                <div 
-                  key={index} 
-                  className="group relative p-2 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 p-2 bg-gray-100 dark:bg-gray-600 rounded-lg">
-                      {notification.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {notification.text}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        {notification.time}
-                      </p>
-                    </div>
-                    <div className={`h-2 w-2 rounded-full mt-2 ${
-                      notification.priority === 'high' ? 'bg-red-500' :
-                      notification.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                    }`} />
-                  </div>
-                  <div className="absolute inset-0 border-l-4 border-transparent group-hover:border-blue-500 transition-all duration-200" />
+              {notifications.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">
+                  No notifications
                 </div>
-              ))}
-            </div>
-            
-            <div className="p-2 bg-gray-50 dark:bg-gray-700/50 text-center">
-              <button className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
-                View all notifications
-              </button>
+              ) : (
+                notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className={`group relative p-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ${
+                      !notification.read_status
+                        ? "bg-blue-50 dark:bg-blue-900/20"
+                        : ""
+                    }`}
+                    onClick={() => markAsRead(notification.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 p-2 bg-gray-100 dark:bg-gray-600 rounded-lg">
+                        {getNotificationIcon(notification.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {notification.message}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(notification.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -236,10 +296,12 @@ const Navbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
         </button> */}
 
         <div className="relative flex items-center space-x-2">
-          <h2 className="flex flex-row items-center text-base font-bold text-[#216ac9] cursor-pointer"
-            onClick={toggleDropdown}>
-                {username}
-                <MdOutlineKeyboardArrowDown className="w-6 h-6"/>
+          <h2
+            className="flex flex-row items-center text-base font-bold text-[#216ac9] cursor-pointer"
+            onClick={toggleDropdown}
+          >
+            {username}
+            <MdOutlineKeyboardArrowDown className="w-6 h-6" />
           </h2>
 
           {isDropdownOpen && (

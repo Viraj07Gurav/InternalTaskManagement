@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../Common/AlertDialog";
+import { toast, ToastContainer } from "react-toastify";
 
 const EmployeeList = () => {
   const [employees, setEmployees] = useState([]);
@@ -81,12 +82,14 @@ const EmployeeList = () => {
 
       if (response.ok) {
         fetchEmployees();
+        toast.success("Employee deleted successfully!");
       } else {
         const data = await response.json();
         setError(data.message);
       }
     } catch (err) {
       setError("Failed to delete employee");
+      toast.error("Failed to delete employee",err);
       console.error("Error:", err);
     }
   };
@@ -97,6 +100,7 @@ const EmployeeList = () => {
       if (isManual) {
         if (!manualPassword) {
           setError("Password cannot be empty");
+          toast.error("Password cannot be empty");
           return;
         }
         passwordToUse = manualPassword;
@@ -122,20 +126,22 @@ const EmployeeList = () => {
 
       if (response.ok) {
         if (!isManual) {
-          alert(
+          toast.success(
             `Password reset successful! Temporary password: ${data.temporaryPassword}`
           );
         } else {
-          alert("Password reset successful!");
+          toast.success("Password reset successful!");
         }
         setManualPassword("");
         setIsManualReset(false);
         setResetPassword(null);
       } else {
         setError(data.message);
+        toast.error(data.message);
       }
     } catch (err) {
       setError("Failed to reset password");
+      toast.error("Failed to reset password");
       console.error("Error:", err);
     }
   };
@@ -318,7 +324,7 @@ const EmployeeList = () => {
               </div>
             </div>
           </div>
-          
+
           <AlertDialogFooter>
             <AlertDialogCancel
               onClick={() => {
@@ -337,6 +343,9 @@ const EmployeeList = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Toast Container for displaying toast messages */}
+      <ToastContainer />
     </div>
   );
 };

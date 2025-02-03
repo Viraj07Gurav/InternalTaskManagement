@@ -147,11 +147,6 @@
 // // Start password hashing process
 // hashPasswords();
 
-
-
-
-
-
 // const express = require("express");
 // const bodyParser = require("body-parser");
 // const jwt = require("jsonwebtoken");
@@ -240,40 +235,36 @@
 //   console.log(`Server running on http://localhost:${PORT}`);
 // });
 
-
-
-
-
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const mysql = require("mysql2");
-const { format } = require('date-fns');
+const { format } = require("date-fns");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(bodyParser.json());
-app.use(cors({
-  origin: "http://localhost:5173", // frontend URL
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
+  })
+);
 
-
-const JWT_SECRET = "your_jwt_secret_key";
-const REFRESH_SECRET = "your_refresh_secret_key";  // Secret for refresh tokens
-
-
+const JWT_SECRET = process.env.JWT_SECRET;
+const REFRESH_SECRET = process.env.REFRESH_SECRET;
 
 // MySQL Database Connection
 const db = mysql.createConnection({
-  host: "localhost",        
-  user: "root",            
-  password: "1020",            
-  database: "TaskFlowApp",   
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
 });
 
 db.connect((err) => {
@@ -284,20 +275,19 @@ db.connect((err) => {
   }
 });
 
-
 // Helper function to generate JWT tokens
 const generateAccessToken = (username, role) => {
-  return jwt.sign({ username, role }, JWT_SECRET, { expiresIn: "1d" }); // Short-lived access token
+  return jwt.sign({ username, role }, JWT_SECRET, { expiresIn: "1d" }); //short lived
 };
 
 const generateRefreshToken = (username) => {
-  return jwt.sign({ username }, REFRESH_SECRET, { expiresIn: "7d" }); // Long-lived refresh token
+  return jwt.sign({ username }, REFRESH_SECRET, { expiresIn: "7d" }); //long lived
 };
 
 // Login route
 // Admin credentials (username and password fixed)
-const ADMIN_USERNAME = "admin";  
-const ADMIN_PASSWORD = "adminpassword";  // Use a hashed password in production, not plain text
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
@@ -313,7 +303,9 @@ app.post("/login", (req, res) => {
       [refreshToken, username],
       (err) => {
         if (err) {
-          return res.status(500).json({ message: "Error storing refresh token" });
+          return res
+            .status(500)
+            .json({ message: "Error storing refresh token" });
         }
 
         res.json({
@@ -331,11 +323,15 @@ app.post("/login", (req, res) => {
       [username],
       (err, results) => {
         if (err) {
-          return res.status(500).json({ message: "Database error", error: err });
+          return res
+            .status(500)
+            .json({ message: "Database error", error: err });
         }
 
         if (results.length === 0) {
-          return res.status(401).json({ message: "Invalid username or password" });
+          return res
+            .status(401)
+            .json({ message: "Invalid username or password" });
         }
 
         const employee = results[0];
@@ -346,7 +342,9 @@ app.post("/login", (req, res) => {
           }
 
           if (!isPasswordValid) {
-            return res.status(401).json({ message: "Invalid username or password" });
+            return res
+              .status(401)
+              .json({ message: "Invalid username or password" });
           }
 
           const accessToken = generateAccessToken(username, employee.role);
@@ -358,7 +356,9 @@ app.post("/login", (req, res) => {
             [refreshToken, username],
             (err) => {
               if (err) {
-                return res.status(500).json({ message: "Error storing refresh token" });
+                return res
+                  .status(500)
+                  .json({ message: "Error storing refresh token" });
               }
 
               res.json({
@@ -375,8 +375,6 @@ app.post("/login", (req, res) => {
     );
   }
 });
-
-
 
 // Refresh Token Route
 app.put("/resetPassword/:username", async (req, res) => {
@@ -398,27 +396,27 @@ app.put("/resetPassword/:username", async (req, res) => {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update the password in the database
-    const [result] = await db.promise().execute(
-      "UPDATE employees SET password = ? WHERE username = ?",
-      [hashedPassword, username]
-    );
+    const [result] = await db
+      .promise()
+      .execute("UPDATE employees SET password = ? WHERE username = ?", [
+        hashedPassword,
+        username,
+      ]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Employee not found" });
     }
 
     // Return success response with the temporary password only for auto-generated passwords
-    res.json({ 
+    res.json({
       message: "Password reset successful",
-      temporaryPassword: newPassword  // This will only be shown for auto-generated passwords
+      temporaryPassword: newPassword, // This will only be shown for auto-generated passwords
     });
-
   } catch (err) {
     console.error("Error resetting password:", err);
     res.status(500).json({ message: "Failed to reset password" });
   }
 });
-
 
 //Reset Password
 app.put("/resetPassword/:username", async (req, res) => {
@@ -440,27 +438,27 @@ app.put("/resetPassword/:username", async (req, res) => {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update the password in the database
-    const [result] = await db.promise().execute(
-      "UPDATE employees SET password = ? WHERE username = ?",
-      [hashedPassword, username]
-    );
+    const [result] = await db
+      .promise()
+      .execute("UPDATE employees SET password = ? WHERE username = ?", [
+        hashedPassword,
+        username,
+      ]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Employee not found" });
     }
 
     // Return success response with the temporary password
-    res.json({ 
+    res.json({
       message: "Password reset successful",
-      temporaryPassword: newPassword
+      temporaryPassword: newPassword,
     });
-
   } catch (err) {
     console.error("Error resetting password:", err);
     res.status(500).json({ message: "Failed to reset password" });
   }
 });
-
 
 // Admin route to add a new employee
 app.post("/addEmployee", async (req, res) => {
@@ -479,83 +477,87 @@ app.post("/addEmployee", async (req, res) => {
     }
 
     // Add new employee
-    db.execute("INSERT INTO employees (username, password, role) VALUES (?, ?, ?)", 
-    [username, hashedPassword, "employee"], (err, results) => {
-      if (err) {
-        return res.status(500).json({ message: "Failed to add employee", error: err });
-      }
+    db.execute(
+      "INSERT INTO employees (username, password, role) VALUES (?, ?, ?)",
+      [username, hashedPassword, "employee"],
+      (err, results) => {
+        if (err) {
+          return res
+            .status(500)
+            .json({ message: "Failed to add employee", error: err });
+        }
 
-      res.status(200).json({ message: "Employee added successfully" });
-    });
+        res.status(200).json({ message: "Employee added successfully" });
+      }
+    );
   });
 });
 
-
 // Admin route to Get all employees
-app.get('/employees', (req, res) => {
+app.get("/employees", (req, res) => {
   // Verify admin authentication
-  const token = req.headers['authorization']?.split(' ')[1];
-  
+  const token = req.headers["authorization"]?.split(" ")[1];
+
   if (!token) {
-    return res.status(401).json({ message: 'Unauthorized' });
+    return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.role !== 'admin') {
-      return res.status(403).json({ message: 'Access denied. Admin only.' });
+    if (decoded.role !== "admin") {
+      return res.status(403).json({ message: "Access denied. Admin only." });
     }
 
     // Fetch employees from database
     db.execute(
-      'SELECT id, username, password, role, created_at FROM employees ORDER BY created_at DESC',
+      "SELECT id, username, password, role, created_at FROM employees ORDER BY created_at DESC",
       (err, results) => {
         if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ message: 'Failed to fetch employees' });
+          console.error("Database error:", err);
+          return res.status(500).json({ message: "Failed to fetch employees" });
         }
         res.json({ employees: results });
       }
     );
   } catch (err) {
-    res.status(401).json({ message: 'Invalid token' });
+    res.status(401).json({ message: "Invalid token" });
   }
 });
 
 // Delete employee
-app.delete('/deleteEmployee/:username', (req, res) => {
+app.delete("/deleteEmployee/:username", (req, res) => {
   const { username } = req.params;
-  const token = req.headers['authorization']?.split(' ')[1];
+  const token = req.headers["authorization"]?.split(" ")[1];
 
   if (!token) {
-    return res.status(401).json({ message: 'Unauthorized' });
+    return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.role !== 'admin') {
-      return res.status(403).json({ message: 'Access denied. Admin only.' });
+    if (decoded.role !== "admin") {
+      return res.status(403).json({ message: "Access denied. Admin only." });
     }
 
     // Delete employee from database
     db.execute(
-      'DELETE FROM employees WHERE username = ?',
+      "DELETE FROM employees WHERE username = ?",
       [username],
       (err, result) => {
         if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ message: 'Failed to delete employee' });
+          console.error("Database error:", err);
+          return res.status(500).json({ message: "Failed to delete employee" });
         }
-        
+
         if (result.affectedRows === 0) {
-          return res.status(404).json({ message: 'Employee not found' });
+          return res.status(404).json({ message: "Employee not found" });
         }
-        
-        res.json({ message: 'Employee deleted successfully' });
+
+        res.json({ message: "Employee deleted successfully" });
       }
     );
   } catch (err) {
-    res.status(401).json({ message: 'Invalid token' });
+    res.status(401).json({ message: "Invalid token" });
   }
 });
 
@@ -577,9 +579,8 @@ app.get("/profile", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Frontend URL: ${process.env.FRONTEND_URL}`);
 });
-
-
 
 //---------------Admin Dashboard to add task to employees---------------------------------
 
@@ -599,10 +600,11 @@ app.post("/tasks", async (req, res) => {
     }
 
     // Verify employee exists and get their ID
-    const [employee] = await db.promise().execute(
-      "SELECT id FROM employees WHERE username = ?",
-      [assignee_username]
-    );
+    const [employee] = await db
+      .promise()
+      .execute("SELECT id FROM employees WHERE username = ?", [
+        assignee_username,
+      ]);
 
     if (!employee.length) {
       return res.status(404).json({ message: "Employee not found" });
@@ -627,9 +629,13 @@ app.post("/tasks", async (req, res) => {
     let formatted_date;
     try {
       // Check if date is in DD-MM-YYYY format
-      if (start_date.includes('-')) {
-        const [day, month, year] = start_date.split('-').map(num => parseInt(num, 10));
-        formatted_date = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      if (start_date.includes("-")) {
+        const [day, month, year] = start_date
+          .split("-")
+          .map((num) => parseInt(num, 10));
+        formatted_date = `${year}-${month.toString().padStart(2, "0")}-${day
+          .toString()
+          .padStart(2, "0")}`;
       } else {
         // If date is already in YYYY-MM-DD format
         formatted_date = start_date;
@@ -638,29 +644,41 @@ app.post("/tasks", async (req, res) => {
       // Validate the date
       const dateObj = new Date(formatted_date);
       if (isNaN(dateObj.getTime())) {
-        throw new Error('Invalid date');
+        throw new Error("Invalid date");
       }
     } catch (error) {
-      return res.status(400).json({ message: "Invalid date format. Please use DD-MM-YYYY or YYYY-MM-DD format" });
+      return res
+        .status(400)
+        .json({
+          message:
+            "Invalid date format. Please use DD-MM-YYYY or YYYY-MM-DD format",
+        });
     }
 
     // Insert task
-    const [result] = await db.promise().execute(
-      "INSERT INTO tasks (assignee_id, assignee_username, client, package, start_date, total_subtasks) VALUES (?, ?, ?, ?, ?, ?)",
-      [employee[0].id, assignee_username, client, package, formatted_date, total_subtasks]
-    );
+    const [result] = await db
+      .promise()
+      .execute(
+        "INSERT INTO tasks (assignee_id, assignee_username, client, package, start_date, total_subtasks) VALUES (?, ?, ?, ?, ?, ?)",
+        [
+          employee[0].id,
+          assignee_username,
+          client,
+          package,
+          formatted_date,
+          total_subtasks,
+        ]
+      );
 
-    res.status(201).json({ 
-      message: "Task added successfully", 
-      taskId: result.insertId 
+    res.status(201).json({
+      message: "Task added successfully",
+      taskId: result.insertId,
     });
-
   } catch (err) {
     console.error("Error adding employee:", err);
     res.status(500).json({ message: "Error adding employee" });
   }
 });
-
 
 // Get tasks with proper error handling
 app.get("/tasks", async (req, res) => {
@@ -691,9 +709,9 @@ app.get("/tasks", async (req, res) => {
 
     console.log("Tasks fetched from database:", tasks);
 
-    const formattedTasks = tasks.map(task => ({
+    const formattedTasks = tasks.map((task) => ({
       ...task,
-      start_date: format(new Date(task.start_date), 'dd-MM-yyyy')
+      start_date: format(new Date(task.start_date), "dd-MM-yyyy"),
     }));
 
     res.json({ tasks: formattedTasks });
@@ -702,7 +720,6 @@ app.get("/tasks", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch tasks" });
   }
 });
-
 
 // Update a task
 app.put("/tasks/:id", (req, res) => {
@@ -737,8 +754,6 @@ app.put("/tasks/:id", (req, res) => {
   }
 });
 
-
-
 // Delete a task
 app.delete("/tasks/:id", (req, res) => {
   const { id } = req.params;
@@ -755,30 +770,24 @@ app.delete("/tasks/:id", (req, res) => {
     }
 
     // Delete task from the database
-    db.execute(
-      "DELETE FROM tasks WHERE id = ?",
-      [id],
-      (err, results) => {
-        if (err) {
-          console.error("Database error:", err);
-          return res.status(500).json({ message: "Failed to delete task" });
-        }
-        res.json({ message: "Task deleted successfully" });
+    db.execute("DELETE FROM tasks WHERE id = ?", [id], (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ message: "Failed to delete task" });
       }
-    );
+      res.json({ message: "Task deleted successfully" });
+    });
   } catch (err) {
     res.status(401).json({ message: "Invalid token" });
   }
 });
-
-
 
 //---------------Employee Side---------------------------------
 
 // Backend: new endpoint to fetch tasks by employee username
 app.get("/tasks/employee/:username", async (req, res) => {
   const { username } = req.params;
-  
+
   try {
     const [rows] = await db.promise().execute(
       `SELECT 
@@ -791,11 +800,12 @@ app.get("/tasks/employee/:username", async (req, res) => {
     );
 
     // Ensure daily_completions is properly parsed
-    const tasks = rows.map(task => ({
+    const tasks = rows.map((task) => ({
       ...task,
-      daily_completions: typeof task.daily_completions === 'string' 
-        ? JSON.parse(task.daily_completions)
-        : (task.daily_completions || {})
+      daily_completions:
+        typeof task.daily_completions === "string"
+          ? JSON.parse(task.daily_completions)
+          : task.daily_completions || {},
     }));
 
     res.json({ tasks });
@@ -805,84 +815,321 @@ app.get("/tasks/employee/:username", async (req, res) => {
   }
 });
 
-
 // PUT endpoint to allow multiple task type selections
 app.put("/tasks/:id/complete", async (req, res) => {
   const { id } = req.params;
-  const { completedTasks, date } = req.body;
+  const { completedTasks, date, allCompletions } = req.body;
 
   try {
-    // Validate input
     if (!completedTasks || !date) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: "Missing required fields",
-        receivedData: { completedTasks, date }
       });
     }
 
-    const [rows] = await db.promise().execute(
-      "SELECT daily_completions, total_subtasks FROM tasks WHERE id = ?",
-      [id]
-    );
+    const [rows] = await db
+      .promise()
+      .execute("SELECT daily_completions FROM tasks WHERE id = ?", [id]);
 
     if (!rows.length) {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    let dailyCompletions = {};
-    try {
-      dailyCompletions = rows[0].daily_completions 
-        ? JSON.parse(rows[0].daily_completions) 
-        : {};
-    } catch (parseError) {
-      console.error("Failed to parse daily_completions:", parseError);
-      dailyCompletions = {};
-    }
-
-    // Ensure date entry exists with default structure
-    dailyCompletions[date] = dailyCompletions[date] || {
-      posts: false,
-      reels: false,
-      mockups: false
-    };
-
-    // Merge completions, prioritizing existing true values
-    dailyCompletions[date] = {
-      posts: dailyCompletions[date].posts || completedTasks.posts || false,
-      reels: dailyCompletions[date].reels || completedTasks.reels || false,
-      mockups: dailyCompletions[date].mockups || completedTasks.mockups || false
-    };
-
-    // Recalculate total completed subtasks
-    let totalCompleted = Object.values(dailyCompletions)
-      .flatMap(day => Object.values(day))
-      .filter(Boolean).length;
-
-    // Update database
+    // Update database with all historical completions
     const [updateResult] = await db.promise().execute(
       `UPDATE tasks 
-       SET daily_completions = ?,
-           completed_subtasks = ?
+       SET daily_completions = ?
        WHERE id = ?`,
-      [JSON.stringify(dailyCompletions), totalCompleted, id]
+      [JSON.stringify(allCompletions), id]
+    );
+
+    // Calculate total completed tasks for progress tracking
+    const totalCompleted = Object.values(allCompletions)
+      .flatMap((day) => Object.values(day))
+      .filter(Boolean).length;
+
+    // Update the completed_subtasks count
+    await db.promise().execute(
+      `UPDATE tasks 
+       SET completed_subtasks = ?
+       WHERE id = ?`,
+      [totalCompleted, id]
     );
 
     res.json({
       message: "Task completion updated successfully",
-      task: { daily_completions: dailyCompletions }
+      task: {
+        daily_completions: allCompletions,
+        completed_subtasks: totalCompleted,
+      },
     });
-
   } catch (err) {
-    console.error("Detailed error updating task completion:", {
-      message: err.message,
-      stack: err.stack,
-      requestBody: { completedTasks, date }
-    });
+    console.error("Error updating task completion:", err);
+    res.status(500).json({ message: "Failed to update task completion" });
+  }
+});
 
-    res.status(500).json({ 
-      message: "Failed to update task completion", 
-      error: err.message,
-      details: err.stack
+// ---------------------------Function to create a notification------------------------------------------
+const createNotification = async (userId, username, message, type) => {
+  try {
+    const [result] = await db
+      .promise()
+      .execute(
+        "INSERT INTO notifications (user_id, username, message, type) VALUES (?, ?, ?, ?)",
+        [userId, username, message, type]
+      );
+    return result.insertId;
+  } catch (error) {
+    console.error("Error creating notification:", error);
+    throw error;
+  }
+};
+
+// Helper function to format date to YYYY-MM-DD
+const formatDate = (date) => {
+  return date.toISOString().split("T")[0];
+};
+
+// Function to check deadlines and create notifications
+const checkDeadlinesAndNotify = async () => {
+  try {
+    // Fetch all pending tasks with employee information
+    const [tasks] = await db.promise().execute(`
+      SELECT 
+        t.*,
+        e.id as employee_id,
+        e.username,
+        DATE_ADD(t.start_date, INTERVAL 30 DAY) as end_date
+      FROM tasks t
+      JOIN employees e ON t.assignee_id = e.id
+      WHERE t.status = 'Pending'
+    `);
+
+    const currentDate = new Date();
+    const currentDateStr = formatDate(currentDate);
+
+    for (const task of tasks) {
+      const dailyCompletions = JSON.parse(task.daily_completions || "{}");
+
+      // Calculate expected daily tasks based on package type
+      let expectedDailyTasks;
+      switch (task.package) {
+        case "Starter":
+          expectedDailyTasks = 3; // At least 1 task per day
+          break;
+        case "Premium":
+          expectedDailyTasks = 3; // At least 2 tasks per day
+          break;
+        case "Super Pro":
+          expectedDailyTasks = 3; // At least 3 tasks per day
+          break;
+        default:
+          expectedDailyTasks = 1;
+      }
+
+      // Check for overdue tasks
+      const startDate = new Date(task.start_date);
+      const yesterday = new Date(currentDate);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = formatDate(yesterday);
+
+      // Get all dates from start_date until yesterday
+      const dates = [];
+      let currentCheckDate = new Date(startDate);
+      while (currentCheckDate <= yesterday) {
+        dates.push(formatDate(currentCheckDate));
+        currentCheckDate.setDate(currentCheckDate.getDate() + 1);
+      }
+
+      // Check each date for incomplete tasks
+      for (const date of dates) {
+        const dateCompletions = dailyCompletions[date] || {};
+        const completedTasks =
+          Object.values(dateCompletions).filter(Boolean).length;
+
+        if (completedTasks < expectedDailyTasks) {
+          // Create overdue notification for employee
+          await createNotification(
+            task.employee_id,
+            task.username,
+            `You have incomplete tasks from ${date} for client ${task.client}. Expected: ${expectedDailyTasks}, Completed: ${completedTasks}`,
+            "overdue"
+          );
+
+          // Create overdue notification for admin
+          await createNotification(
+            null,
+            "admin",
+            `Employee ${task.username} has incomplete tasks from ${date} for client ${task.client}. Expected: ${expectedDailyTasks}, Completed: ${completedTasks}`,
+            "overdue"
+          );
+        }
+      }
+
+      // Check for approaching deadlines (today's tasks)
+      const todayCompletions = dailyCompletions[currentDateStr] || {};
+      const completedToday =
+        Object.values(todayCompletions).filter(Boolean).length;
+
+      if (completedToday < expectedDailyTasks) {
+        const currentHour = currentDate.getHours();
+        const remainingHours = 24 - currentHour;
+
+        if (remainingHours <= 6 && remainingHours > 0) {
+          await createNotification(
+            task.employee_id,
+            task.username,
+            `Warning: Only ${remainingHours} hours left to complete today's tasks for client ${task.client}. Required: ${expectedDailyTasks}, Completed: ${completedToday}`,
+            "deadline"
+          );
+        }
+      }
+
+      // Check for package end date approaching
+      const endDate = new Date(task.end_date);
+      const daysUntilEnd = Math.ceil(
+        (endDate - currentDate) / (1000 * 60 * 60 * 24)
+      );
+
+      if (daysUntilEnd <= 7 && daysUntilEnd > 0) {
+        // Notify both admin and employee about package end date
+        await createNotification(
+          null,
+          "admin",
+          `Package for client ${task.client} (assigned to ${task.username}) will end in ${daysUntilEnd} days`,
+          "package_end"
+        );
+
+        await createNotification(
+          task.employee_id,
+          task.username,
+          `Your package for client ${task.client} will end in ${daysUntilEnd} days`,
+          "package_end"
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error checking deadlines:", error);
+  }
+};
+
+// First, let's add a debug endpoint to check the database connection
+app.get("/debug/db-status", async (req, res) => {
+  try {
+    const [result] = await db.promise().execute("SELECT 1");
+    res.json({ status: "Database connection is working", result });
+  } catch (error) {
+    console.error("Database connection test failed:", error);
+    res.status(500).json({
+      status: "Database connection failed",
+      error: error.message,
     });
   }
 });
+
+// Modified notifications endpoint with enhanced error handling
+app.get("/notifications", async (req, res) => {
+  const username = req.query.username;
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res
+      .status(401)
+      .json({ message: "Unauthorized - No token provided" });
+  }
+
+  try {
+    // Verify token
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    // Validate username
+    if (!username) {
+      return res
+        .status(400)
+        .json({ message: "Username parameter is required" });
+    }
+
+    // Construct query based on role
+    let query;
+    let queryParams;
+
+    if (decoded.role === "admin") {
+      // Admin can see all notifications (their own and employees')
+      query = `
+        SELECT 
+          n.*,
+          DATE_FORMAT(n.created_at, '%Y-%m-%d %H:%i:%s') as formatted_date 
+        FROM notifications n 
+        WHERE n.username = ? OR n.username = 'admin'
+        ORDER BY n.created_at DESC 
+        LIMIT 50`;
+      queryParams = [username];
+    } else {
+      // Employees can only see their own notifications
+      query = `
+        SELECT 
+          n.*,
+          DATE_FORMAT(n.created_at, '%Y-%m-%d %H:%i:%s') as formatted_date 
+        FROM notifications n 
+        WHERE n.username = ? 
+        ORDER BY n.created_at DESC 
+        LIMIT 50`;
+      queryParams = [username];
+    }
+
+    // Execute query
+    const [notifications] = await db.promise().execute(query, queryParams);
+
+    // Send response
+    res.json({
+      success: true,
+      notifications,
+      metadata: {
+        total: notifications.length,
+        userRole: decoded.role,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Error in /notifications endpoint:", error);
+    res.status(500).json({
+      message: "Failed to fetch notifications",
+      error: error.message,
+    });
+  }
+});
+
+// Helper function to check if notifications table exists
+const checkNotificationsTable = async () => {
+  try {
+    const [tables] = await db.promise().execute(`
+      SELECT TABLE_NAME 
+      FROM information_schema.TABLES 
+      WHERE TABLE_SCHEMA = 'TaskFlowApp' 
+      AND TABLE_NAME = 'notifications'
+    `);
+
+    if (tables.length === 0) {
+      console.log("Notifications table does not exist. Creating it...");
+      await db.promise().execute(`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT,
+          username VARCHAR(255),
+          message TEXT NOT NULL,
+          type ENUM('deadline', 'overdue', 'completion', 'package_end') NOT NULL,
+          read_status BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES employees(id) ON DELETE CASCADE
+        )
+      `);
+      console.log("Notifications table created successfully");
+    }
+  } catch (error) {
+    console.error("Error checking/creating notifications table:", error);
+    throw error;
+  }
+};
+
+// Run table check when server starts
+checkNotificationsTable().catch(console.error);

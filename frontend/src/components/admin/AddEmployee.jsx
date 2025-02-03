@@ -5,6 +5,7 @@ import Input from "../Common/Input";
 import Button from "../Common/Button";
 import { Alert, AlertTitle, AlertDescription } from "../Common/SuccessDialog";
 import { CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { toast, ToastContainer } from 'react-toastify';
 
 const AddEmployee = () => {
   const [username, setUsername] = useState("");
@@ -46,9 +47,13 @@ const AddEmployee = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setShowSuccess(true);
+        // Show success toast message
+        toast.success("Employee added successfully!", {
+          position: "top-right",
+          autoClose: 2000,
+        });
+
         setTimeout(() => {
-          setShowSuccess(false);
           navigate("/dashboard"); // Redirect to dashboard after success
         }, 2000);
       } else {
@@ -138,6 +143,10 @@ const AddEmployee = () => {
           </Button>
         </form>
       </div>
+
+      {/* Toast Container for displaying toast messages */}
+      <ToastContainer />
+
     </div>
   );
 };

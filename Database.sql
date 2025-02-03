@@ -44,6 +44,8 @@ ALTER TABLE tasks
 MODIFY COLUMN daily_completions JSON NULL;
 
 
+
+
 ALTER TABLE tasks 
 ADD INDEX idx_assignee_username (assignee_username);
 
@@ -57,7 +59,35 @@ SHOW TABLES;
 
 DESCRIBE tasks;
 
+
+
+
+
+-- for testing
+
 SELECT * FROM tasks WHERE assignee_username = 'prem';
 
+SELECT 
+    assignee_username, 
+    package, 
+    COUNT(*) AS completed_tasks
+FROM 
+    tasks
+WHERE 
+    assignee_username = 'prem'  -- Specify the employee's username
+    AND start_date >= '2025-01-31'  -- Start date (you can adjust this)
+    AND start_date <= '2025-02-02'  -- End date (you can adjust this)
+    AND status = 'Pending'  -- Only completed tasks
+GROUP BY 
+    assignee_username, package
+ORDER BY 
+    completed_tasks DESC;
+
+
+SELECT * 
+FROM tasks 
+WHERE assignee_username = 'prem' 
+    AND start_date BETWEEN '2025-01-31' AND '2025-02-02' 
+    AND status = 'Pending';
 
 
