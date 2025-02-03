@@ -235,6 +235,8 @@
 //   console.log(`Server running on http://localhost:${PORT}`);
 // });
 
+
+
 require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -670,6 +672,14 @@ app.post("/tasks", async (req, res) => {
         ]
       );
 
+      // Create a notification for the employee
+    await createNotification(
+      employee[0].id,
+      assignee_username,
+      `New task assigned for client ${client}`,
+      "task_assigned"
+    );
+
     res.status(201).json({
       message: "Task added successfully",
       taskId: result.insertId,
@@ -713,6 +723,25 @@ app.get("/tasks", async (req, res) => {
       ...task,
       start_date: format(new Date(task.start_date), "dd-MM-yyyy"),
     }));
+
+    const markAsRead = async (notificationId) => {
+      try {
+        const response = await axios.put(
+          `http://localhost:5000/notifications/${notificationId}/read`,
+          {},
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+    
+        if (response.data.message === "Notification marked as read") {
+          // Refresh notifications
+          fetchNotifications();
+        }
+      } catch (error) {
+        console.error("Error marking notification as read:", error);
+      }
+    };
 
     res.json({ tasks: formattedTasks });
   } catch (err) {
@@ -869,15 +898,100 @@ app.put("/tasks/:id/complete", async (req, res) => {
   }
 });
 
+
+// Complete package endpoint
+app.put("/tasks/:id/complete-package", async (req, res) => {
+  const { id } = req.params;
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    // Verify token and get task details
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Get the current task details
+    const [task] = await db.promise().execute(
+      "SELECT * FROM tasks WHERE id = ?",
+      [id]
+    );
+
+    if (!task.length) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    // Verify all required tasks are completed
+    const taskData = task[0];
+    if (taskData.completed_subtasks < taskData.total_subtasks) {
+      return res.status(400).json({ 
+        message: "Cannot complete package - not all required tasks are finished",
+        completed: taskData.completed_subtasks,
+        required: taskData.total_subtasks
+      });
+    }
+
+    // Update task status to completed
+    const [updateResult] = await db.promise().execute(
+      `UPDATE tasks 
+       SET status = 'Completed',
+           completed_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [id]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      throw new Error('Failed to update task status');
+    }
+
+    // Create a completion notification
+    await createNotification(
+      taskData.assignee_id,
+      taskData.assignee_username,
+      `Package completed for client ${taskData.client}`,
+      'completion'
+    );
+
+    res.json({
+      message: "Package marked as completed successfully",
+      taskId: id
+    });
+
+  } catch (err) {
+    console.error("Error completing package:", err);
+    res.status(500).json({ 
+      message: "Failed to complete package",
+      error: err.message 
+    });
+  }
+});
+
+
 // ---------------------------Function to create a notification------------------------------------------
 const createNotification = async (userId, username, message, type) => {
   try {
-    const [result] = await db
-      .promise()
-      .execute(
+    console.log("Creating notification with params:", { userId, username, message, type });
+    
+    // Create notification for the employee
+    const [result] = await db.promise().execute(
+      "INSERT INTO notifications (user_id, username, message, type) VALUES (?, ?, ?, ?)",
+      [userId, username, message, type]
+    );
+
+    // Create notification for the admin
+    const [admin] = await db.promise().execute(
+      "SELECT id FROM employees WHERE role = 'admin' LIMIT 1"
+    );
+
+    if (admin.length > 0) {
+      await db.promise().execute(
         "INSERT INTO notifications (user_id, username, message, type) VALUES (?, ?, ?, ?)",
-        [userId, username, message, type]
+        [admin[0].id, 'admin', message, type]
       );
+    }
+
+    console.log("Notification created successfully:", result);
     return result.insertId;
   } catch (error) {
     console.error("Error creating notification:", error);
@@ -893,125 +1007,228 @@ const formatDate = (date) => {
 // Function to check deadlines and create notifications
 const checkDeadlinesAndNotify = async () => {
   try {
-    // Fetch all pending tasks with employee information
+    console.log("Checking deadlines and creating notifications...");
     const [tasks] = await db.promise().execute(`
-      SELECT 
-        t.*,
-        e.id as employee_id,
-        e.username,
-        DATE_ADD(t.start_date, INTERVAL 30 DAY) as end_date
+      SELECT t.*, e.id as employee_id, e.username
       FROM tasks t
       JOIN employees e ON t.assignee_id = e.id
       WHERE t.status = 'Pending'
     `);
 
     const currentDate = new Date();
-    const currentDateStr = formatDate(currentDate);
 
     for (const task of tasks) {
-      const dailyCompletions = JSON.parse(task.daily_completions || "{}");
-
-      // Calculate expected daily tasks based on package type
-      let expectedDailyTasks;
-      switch (task.package) {
-        case "Starter":
-          expectedDailyTasks = 3; // At least 1 task per day
-          break;
-        case "Premium":
-          expectedDailyTasks = 3; // At least 2 tasks per day
-          break;
-        case "Super Pro":
-          expectedDailyTasks = 3; // At least 3 tasks per day
-          break;
-        default:
-          expectedDailyTasks = 1;
-      }
+      const endDate = new Date(task.start_date);
+      endDate.setDate(endDate.getDate() + 30); // Assuming a 30-day deadline
 
       // Check for overdue tasks
-      const startDate = new Date(task.start_date);
-      const yesterday = new Date(currentDate);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = formatDate(yesterday);
-
-      // Get all dates from start_date until yesterday
-      const dates = [];
-      let currentCheckDate = new Date(startDate);
-      while (currentCheckDate <= yesterday) {
-        dates.push(formatDate(currentCheckDate));
-        currentCheckDate.setDate(currentCheckDate.getDate() + 1);
-      }
-
-      // Check each date for incomplete tasks
-      for (const date of dates) {
-        const dateCompletions = dailyCompletions[date] || {};
-        const completedTasks =
-          Object.values(dateCompletions).filter(Boolean).length;
-
-        if (completedTasks < expectedDailyTasks) {
-          // Create overdue notification for employee
-          await createNotification(
-            task.employee_id,
-            task.username,
-            `You have incomplete tasks from ${date} for client ${task.client}. Expected: ${expectedDailyTasks}, Completed: ${completedTasks}`,
-            "overdue"
-          );
-
-          // Create overdue notification for admin
-          await createNotification(
-            null,
-            "admin",
-            `Employee ${task.username} has incomplete tasks from ${date} for client ${task.client}. Expected: ${expectedDailyTasks}, Completed: ${completedTasks}`,
-            "overdue"
-          );
-        }
-      }
-
-      // Check for approaching deadlines (today's tasks)
-      const todayCompletions = dailyCompletions[currentDateStr] || {};
-      const completedToday =
-        Object.values(todayCompletions).filter(Boolean).length;
-
-      if (completedToday < expectedDailyTasks) {
-        const currentHour = currentDate.getHours();
-        const remainingHours = 24 - currentHour;
-
-        if (remainingHours <= 6 && remainingHours > 0) {
-          await createNotification(
-            task.employee_id,
-            task.username,
-            `Warning: Only ${remainingHours} hours left to complete today's tasks for client ${task.client}. Required: ${expectedDailyTasks}, Completed: ${completedToday}`,
-            "deadline"
-          );
-        }
-      }
-
-      // Check for package end date approaching
-      const endDate = new Date(task.end_date);
-      const daysUntilEnd = Math.ceil(
-        (endDate - currentDate) / (1000 * 60 * 60 * 24)
-      );
-
-      if (daysUntilEnd <= 7 && daysUntilEnd > 0) {
-        // Notify both admin and employee about package end date
-        await createNotification(
-          null,
-          "admin",
-          `Package for client ${task.client} (assigned to ${task.username}) will end in ${daysUntilEnd} days`,
-          "package_end"
-        );
-
+      if (endDate < currentDate) {
+        console.log(`Creating overdue notification for task ${task.id} (${task.client})`);
         await createNotification(
           task.employee_id,
           task.username,
-          `Your package for client ${task.client} will end in ${daysUntilEnd} days`,
-          "package_end"
+          `You have incomplete tasks from ${task.start_date} for client ${task.client}.`,
+          "overdue"
         );
+
+        // Notify admin
+        const [admin] = await db.promise().execute("SELECT id FROM employees WHERE role = 'admin' LIMIT 1");
+        if (admin.length > 0) {
+          console.log(`Creating overdue notification for admin`);
+          await createNotification(
+            admin[0].id,
+            "admin",
+            `Overdue task for ${task.username} (Client: ${task.client})`,
+            "overdue"
+          );
+        }
+      }
+
+      // Check for approaching deadlines (within 3 days)
+      if (endDate - currentDate <= 3 * 24 * 60 * 60 * 1000 && endDate >= currentDate) {
+        console.log(`Creating deadline notification for task ${task.id} (${task.client})`);
+        await createNotification(
+          task.employee_id,
+          task.username,
+          `Your task deadline is approaching for client ${task.client}. Due: ${endDate.toISOString().split('T')[0]}`,
+          "deadline"
+        );
+
+        // Notify admin
+        const [admin] = await db.promise().execute("SELECT id FROM employees WHERE role = 'admin' LIMIT 1");
+        if (admin.length > 0) {
+          console.log(`Creating deadline notification for admin`);
+          await createNotification(
+            admin[0].id,
+            "admin",
+            `Approaching deadline for ${task.username} (Client: ${task.client})`,
+            "deadline"
+          );
+        }
       }
     }
   } catch (error) {
     console.error("Error checking deadlines:", error);
   }
 };
+
+// Run the deadline check every hour
+setInterval(checkDeadlinesAndNotify, 60 * 60 * 1000);
+
+// Modified notifications endpoint with enhanced error handling
+app.get("/notifications", async (req, res) => {
+  const username = req.query.username;
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  console.log("Notifications request received for username:", username);
+  console.log("Token present:", !!token);
+
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized - No token provided" });
+  }
+
+  try {
+    // Verify token
+    const decoded = jwt.verify(token, JWT_SECRET);
+    console.log("Decoded token:", { role: decoded.role, username: decoded.username });
+
+    // Validate username
+    if (!username) {
+      return res.status(400).json({ message: "Username parameter is required" });
+    }
+
+    // Debug log for query parameters
+    console.log("Querying notifications for:", {
+      username,
+      userRole: decoded.role
+    });
+
+    // Construct query based on role
+    let query;
+    let queryParams;
+
+    if (decoded.role === "admin") {
+      query = `
+        SELECT 
+          n.*,
+          DATE_FORMAT(n.created_at, '%Y-%m-%d %H:%i:%s') as formatted_date 
+        FROM notifications n 
+        WHERE n.username = ? OR n.username = 'admin'
+        ORDER BY n.created_at DESC 
+        LIMIT 50`;
+      queryParams = [username];
+    } else {
+      query = `
+        SELECT 
+          n.*,
+          DATE_FORMAT(n.created_at, '%Y-%m-%d %H:%i:%s') as formatted_date 
+        FROM notifications n 
+        WHERE n.username = ? 
+        ORDER BY n.created_at DESC 
+        LIMIT 50`;
+      queryParams = [username];
+    }
+
+    // Debug log the query
+    console.log("Executing query:", query);
+    console.log("With parameters:", queryParams);
+
+    // Execute query
+    const [notifications] = await db.promise().execute(query, queryParams);
+    
+    console.log("Query results:", {
+      count: notifications.length,
+      firstNotification: notifications[0] || null
+    });
+
+    // Send response
+    res.json({
+      success: true,
+      notifications,
+      metadata: {
+        total: notifications.length,
+        userRole: decoded.role,
+        timestamp: new Date().toISOString(),
+        query: {
+          username,
+          role: decoded.role
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Error in /notifications endpoint:", error);
+    res.status(500).json({
+      message: "Failed to fetch notifications",
+      error: error.message,
+      details: {
+        username,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+});
+
+// Add a test endpoint to create a notification
+app.post("/debug/create-test-notification", async (req, res) => {
+  const { username } = req.body;
+  
+  try {
+    // Get user ID from username
+    const [users] = await db.promise().execute(
+      "SELECT id FROM employees WHERE username = ?",
+      [username]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Create a test notification
+    const [result] = await db.promise().execute(
+      "INSERT INTO notifications (user_id, username, message, type) VALUES (?, ?, ?, ?)",
+      [users[0].id, username, "Test notification", "deadline"]
+    );
+
+    res.json({
+      success: true,
+      message: "Test notification created",
+      notificationId: result.insertId
+    });
+  } catch (error) {
+    console.error("Error creating test notification:", error);
+    res.status(500).json({ message: "Failed to create test notification", error: error.message });
+  }
+});
+
+// Mark notification as read
+app.put("/notifications/:id/read", async (req, res) => {
+  const { id } = req.params;
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    // Verify token
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    // Update notification read status
+    const [result] = await db.promise().execute(
+      "UPDATE notifications SET read_status = TRUE WHERE id = ?",
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+
+    res.json({ message: "Notification marked as read" });
+  } catch (err) {
+    console.error("Error marking notification as read:", err);
+    res.status(500).json({ message: "Failed to mark notification as read" });
+  }
+});
 
 // First, let's add a debug endpoint to check the database connection
 app.get("/debug/db-status", async (req, res) => {
@@ -1027,77 +1244,7 @@ app.get("/debug/db-status", async (req, res) => {
   }
 });
 
-// Modified notifications endpoint with enhanced error handling
-app.get("/notifications", async (req, res) => {
-  const username = req.query.username;
-  const token = req.headers["authorization"]?.split(" ")[1];
 
-  if (!token) {
-    return res
-      .status(401)
-      .json({ message: "Unauthorized - No token provided" });
-  }
-
-  try {
-    // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET);
-
-    // Validate username
-    if (!username) {
-      return res
-        .status(400)
-        .json({ message: "Username parameter is required" });
-    }
-
-    // Construct query based on role
-    let query;
-    let queryParams;
-
-    if (decoded.role === "admin") {
-      // Admin can see all notifications (their own and employees')
-      query = `
-        SELECT 
-          n.*,
-          DATE_FORMAT(n.created_at, '%Y-%m-%d %H:%i:%s') as formatted_date 
-        FROM notifications n 
-        WHERE n.username = ? OR n.username = 'admin'
-        ORDER BY n.created_at DESC 
-        LIMIT 50`;
-      queryParams = [username];
-    } else {
-      // Employees can only see their own notifications
-      query = `
-        SELECT 
-          n.*,
-          DATE_FORMAT(n.created_at, '%Y-%m-%d %H:%i:%s') as formatted_date 
-        FROM notifications n 
-        WHERE n.username = ? 
-        ORDER BY n.created_at DESC 
-        LIMIT 50`;
-      queryParams = [username];
-    }
-
-    // Execute query
-    const [notifications] = await db.promise().execute(query, queryParams);
-
-    // Send response
-    res.json({
-      success: true,
-      notifications,
-      metadata: {
-        total: notifications.length,
-        userRole: decoded.role,
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
-    console.error("Error in /notifications endpoint:", error);
-    res.status(500).json({
-      message: "Failed to fetch notifications",
-      error: error.message,
-    });
-  }
-});
 
 // Helper function to check if notifications table exists
 const checkNotificationsTable = async () => {

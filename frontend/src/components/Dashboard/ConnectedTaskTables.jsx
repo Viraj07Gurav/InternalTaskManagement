@@ -184,13 +184,13 @@ const ConnectedTaskTables = () => {
     return timeLeft < 6 * 60 * 60 * 1000;
   };
 
-  const handleCompleteTask = (id) => {
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === id ? { ...task, status: "Completed" } : task
-      )
-    );
-  };
+  // const handleCompleteTask = (id) => {
+  //   setTasks((prevTasks) =>
+  //     prevTasks.map((task) =>
+  //       task.id === id ? { ...task, status: "Completed" } : task
+  //     )
+  //   );
+  // };
 
   const getActiveTasks = () => {
     return tasks.filter((task) => {
@@ -240,8 +240,47 @@ const ConnectedTaskTables = () => {
         !dateCompletions.reels ||
         !dateCompletions.mockups;
 
+      // For today's date, only show if it's end of day (after 11:59 PM)
+      if (selectedDate === formattedToday) {
+        const now = new Date();
+        const isEndOfDay = now.getHours() >= 23 && now.getMinutes() >= 59;
+        return isWithinDuration && hasIncompleteTasks && isEndOfDay;
+      }
+
       return isWithinDuration && hasIncompleteTasks;
     });
+  };
+
+  const handleCompleteTask = async (id) => {
+    try {
+      const response = await fetch(
+        `http://localhost:5000/tasks/${id}/complete-package`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            status: "Completed",
+            completionDate: new Date().toISOString(),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to complete task");
+      }
+
+      // Remove the task from the tasks array
+      setTasks((prevTasks) => prevTasks.filter((task) => task.id !== id));
+
+      // Show success message (you can implement your preferred notification method)
+      alert("Task marked as completed successfully!");
+    } catch (error) {
+      console.error("Error completing task:", error);
+      alert("Failed to complete task. Please try again.");
+    }
   };
 
   return (
@@ -268,77 +307,95 @@ const ConnectedTaskTables = () => {
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task) => {
-              const packageInfo = packageRequirements[task.package];
-              return (
-                <tr key={task.id} className="border-b border-gray-300 text-sm">
-                  <td className="px-4 py-2">{task.client}</td>
-                  <td className="px-4 py-2">{task.package}</td>
-                  <td className="px-4 py-2">
-                    <div className="flex flex-col space-y-2">
-                      {Object.entries(packageInfo.dailyTasks).map(([type]) => (
-                        <div key={type} className="flex items-center space-x-4">
-                          <span className="w-20 capitalize">{type}:</span>
-                          <button
-                            onClick={() => handleTaskCompletion(task, type)}
-                            className="flex items-center space-x-2"
-                            disabled={false} // Remove any previous disabling logic
-                          >
-                            {task.dailyCompletions?.[formattedToday]?.[type] ? (
-                              <CheckCircle2 className="w-5 h-5 text-green-500" />
-                            ) : (
-                              <Circle className="w-5 h-5 text-gray-400" />
-                            )}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex flex-col space-y-2">
-                      {Object.entries(packageInfo.total).map(
-                        ([type, total]) => (
-                          <div
-                            key={type}
-                            className="flex items-center space-x-2"
-                          >
-                            <span className="w-20 capitalize">{type}:</span>
-                            <span>
-                              {calculateTotalCompleted(task, type)}/{total}
-                            </span>
-                            <div className="w-24 bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-blue-600 rounded-full h-2"
-                                style={{
-                                  width: `${
-                                    (calculateTotalCompleted(task, type) /
-                                      total) *
-                                    100
-                                  }%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </td>
-                  <td
-                    className={`px-4 py-2 text-sm font-medium ${
-                      isTodayCompleted(task)
-                        ? "text-green-500"
-                        : isTimeLeftLessThanSixHours()
-                        ? "text-red-500"
-                        : ""
-                    }`}
+            {tasks.length === 0 ? (
+              <tr className="text-center">
+                <td colSpan="4" className="px-4 py-3 text-gray-500">
+                  Tasks not assigned for today
+                </td>
+              </tr>
+            ) : (
+              tasks.map((task) => {
+                const packageInfo = packageRequirements[task.package];
+                return (
+                  <tr
+                    key={task.id}
+                    className="border-b border-gray-300 text-sm"
                   >
-                    {isTodayCompleted(task)
-                      ? "Today's Tasks Completed 😊"
-                      : timeLeft}
-                  </td>
-                </tr>
-              );
-            })}
+                    <td className="px-4 py-2">{task.client}</td>
+                    <td className="px-4 py-2">{task.package}</td>
+                    <td className="px-4 py-2">
+                      <div className="flex flex-col space-y-2">
+                        {Object.entries(packageInfo.dailyTasks).map(
+                          ([type]) => (
+                            <div
+                              key={type}
+                              className="flex items-center space-x-4"
+                            >
+                              <span className="w-20 capitalize">{type}:</span>
+                              <button
+                                onClick={() => handleTaskCompletion(task, type)}
+                                className="flex items-center space-x-2"
+                                disabled={false} // Remove any previous disabling logic
+                              >
+                                {task.dailyCompletions?.[formattedToday]?.[
+                                  type
+                                ] ? (
+                                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                ) : (
+                                  <Circle className="w-5 h-5 text-gray-400" />
+                                )}
+                              </button>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex flex-col space-y-2">
+                        {Object.entries(packageInfo.total).map(
+                          ([type, total]) => (
+                            <div
+                              key={type}
+                              className="flex items-center space-x-2"
+                            >
+                              <span className="w-20 capitalize">{type}:</span>
+                              <span>
+                                {calculateTotalCompleted(task, type)}/{total}
+                              </span>
+                              <div className="w-24 bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-blue-600 rounded-full h-2"
+                                  style={{
+                                    width: `${
+                                      (calculateTotalCompleted(task, type) /
+                                        total) *
+                                      100
+                                    }%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </td>
+                    <td
+                      className={`px-4 py-2 text-sm font-medium ${
+                        isTodayCompleted(task)
+                          ? "text-green-500"
+                          : isTimeLeftLessThanSixHours()
+                          ? "text-red-500"
+                          : ""
+                      }`}
+                    >
+                      {isTodayCompleted(task)
+                        ? "Today's Tasks Completed 😊"
+                        : timeLeft}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
@@ -470,94 +527,119 @@ const ConnectedTaskTables = () => {
               <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
                 Status
               </th>
-              <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                Actions
-              </th>
+              {/* Only show Actions column header if at least one task has 100% progress */}
+              {tasks.some(
+                (task) =>
+                  task.status === "Pending" &&
+                  (task.completed_subtasks / task.total_subtasks) * 100 === 100
+              ) && (
+                <th className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task) => {
-              const packageDuration =
-                packageRequirements[task.package].duration;
-              const endDate = new Date(task.start_date);
-              if (isNaN(endDate)) {
-                console.error("Invalid start date for task:", task.start_date);
-                return null; // Skip rendering this task if the date is invalid
-              }
-              endDate.setDate(endDate.getDate() + packageDuration);
+            {tasks.length === 0 ? (
+              <tr className="text-center">
+                <td colSpan="4" className="px-4 py-3 text-gray-500">
+                  Tasks not assigned
+                </td>
+              </tr>
+            ) : (
+              tasks.map((task) => {
+                const packageDuration =
+                  packageRequirements[task.package].duration;
+                const endDate = new Date(task.start_date);
+                if (isNaN(endDate)) {
+                  console.error(
+                    "Invalid start date for task:",
+                    task.start_date
+                  );
+                  return null; // Skip rendering this task if the date is invalid
+                }
+                endDate.setDate(endDate.getDate() + packageDuration);
 
-              const daysLeft = isNaN(endDate)
-                ? 0
-                : differenceInDays(endDate, new Date());
-              const isExpired = daysLeft < 0;
-              const progress =
-                (task.completed_subtasks / task.total_subtasks) * 100;
+                const daysLeft = isNaN(endDate)
+                  ? 0
+                  : differenceInDays(endDate, new Date());
+                const isExpired = daysLeft < 0;
+                const progress =
+                  (task.completed_subtasks / task.total_subtasks) * 100;
 
-              return (
-                <tr
-                  key={task.id}
-                  style={{
-                    backgroundColor:
-                      daysLeft < 7 && daysLeft >= 0 ? "#F76A6A" : "",
-                    color: daysLeft < 7 && daysLeft >= 0 ? "#ffffff" : "",
-                  }}
-                  className="hover:bg-blue-100 bg-white  transition-colors duration-200 border-b border-gray-300 text-[14px] shadow-lg"
-                >
-                  <td className="px-4 py-2 whitespace-nowrap">{task.client}</td>
-                  <td className="px-4 py-2 whitespace-nowrap">
-                    {task.package}
-                  </td>
-                  <td className="px-4 py-2 whitespace-nowrap">
-                    {format(new Date(task.start_date), "MM/dd/yyyy")}
-                  </td>
-                  <td className="px-4 py-2 whitespace-nowrap">
-                    {isExpired ? (
-                      <span className="text-red-500">Expired</span>
-                    ) : (
-                      `${daysLeft} days`
-                    )}
-                  </td>
-                  <td className="px-4 py-2 whitespace-nowrap">
-                    <div className="w-full bg-blue-200 rounded-full h-2 ">
-                      <div
-                        className={`h-2 rounded-full ${
-                          progress === 100 ? "bg-green-500" : "bg-blue-500"
+                // Only show Complete button if all subtasks are completed
+                const showCompleteButton =
+                  task.status === "Pending" && progress === 100;
+
+                return (
+                  <tr
+                    key={task.id}
+                    style={{
+                      backgroundColor:
+                        daysLeft < 7 && daysLeft >= 0 ? "#F76A6A" : "",
+                      color: daysLeft < 7 && daysLeft >= 0 ? "#ffffff" : "",
+                    }}
+                    className="hover:bg-blue-100 bg-white  transition-colors duration-200 border-b border-gray-300 text-[14px] shadow-lg"
+                  >
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      {task.client}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      {task.package}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      {format(new Date(task.start_date), "MM/dd/yyyy")}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      {isExpired ? (
+                        <span className="text-red-500">Expired</span>
+                      ) : (
+                        `${daysLeft} days`
+                      )}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <div className="w-full bg-blue-200 rounded-full h-2 ">
+                        <div
+                          className={`h-2 rounded-full ${
+                            progress === 100 ? "bg-green-500" : "bg-blue-500"
+                          }`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <span className="block text-center text-sm">
+                        {task.completed_subtasks}/{task.total_subtasks}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 rounded-full text-sm font-medium ${
+                          task.status === "Pending"
+                            ? "bg-yellow-200 text-yellow-800"
+                            : "bg-green-200 text-green-800"
                         }`}
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                    <span className="block text-center text-sm">
-                      {task.completed_subtasks}/{task.total_subtasks}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 whitespace-nowrap">
-                    <span
-                      className={`px-2 py-1 rounded-full text-sm font-medium ${
-                        task.status === "Pending"
-                          ? "bg-yellow-200 text-yellow-800"
-                          : "bg-green-200 text-green-800"
-                      }`}
-                    >
-                      {task.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 whitespace-nowrap">
-                    {task.status === "Pending" && (
-                      <button
-                        className="bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-4 py-1 rounded-md flex items-center"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCompleteTask(task.id);
-                        }}
                       >
-                        <CheckCircle className="mr-2 w-4 h-4" />
-                        Complete
-                      </button>
+                        {task.status}
+                      </span>
+                    </td>
+                    {/* Only render the Actions column if the button should be shown */}
+                    {showCompleteButton && (
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        <button
+                          className="bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-4 py-1 rounded-md flex items-center"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCompleteTask(task.id);
+                          }}
+                        >
+                          <CheckCircle className="mr-2 w-4 h-4" />
+                          Complete
+                        </button>
+                      </td>
                     )}
-                  </td>
-                </tr>
-              );
-            })}
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
@@ -566,6 +648,9 @@ const ConnectedTaskTables = () => {
 };
 
 export default ConnectedTaskTables;
+
+
+
 
 // // Temporary testing: Simulate end of day
 // const getOverdueTasks = () => {
